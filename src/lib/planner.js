@@ -41,6 +41,19 @@ export function settle(nodes, idx){
   return out;
 }
 
+// Current value of each holding in cents, combining duplicate symbols. Same valuation rule as plan():
+// shares × price when both are known, otherwise the dollar value. Holdings with neither are skipped.
+export function currentValues(holdings){
+  const V = new Map();
+  for (const h of holdings){
+    const sym = (h.sym || '').trim().toUpperCase(); if (!sym) continue;
+    const val = h.shares != null && h.price ? h.shares * h.price : h.value;
+    if (val == null) continue;
+    V.set(sym, (V.get(sym) || 0) + C(val));
+  }
+  return V;
+}
+
 // input: {holdings:[{sym,shares,price,value}], targets:[{sym,pct}], cash, units, tol}
 export function plan(inp){
   const errors = [], notes = [];

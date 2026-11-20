@@ -3,7 +3,7 @@ import { $ } from './dom.js';
 import { S, M, K, priceOf, currentHoldings } from './state.js';
 import { store } from '../lib/store.js';
 import { num, esc } from '../lib/format.js';
-import { plan, isMFSym } from '../lib/planner.js';
+import { currentValues, isMFSym } from '../lib/planner.js';
 import { addClears } from './clears.js';
 import { fit } from './fit.js';
 import { recompute } from './results.js';
@@ -68,8 +68,8 @@ export function initTables(){
   $('addHold').onclick = () => { S.holdings.push({sym: '', shares: null, value: null}); renderHold(); };
   $('addTgt').onclick = () => { S.targets.push({sym: '', pct: null}); renderTgt(); };
   $('fromCur').onclick = () => {
-    const r = plan({holdings: currentHoldings(), targets: [{sym: 'X', pct: 100}], cash: 0, units: 'dollars'});
-    const funds = r.rows.filter(x => x.kind === 'fund' && x.cur > 0 && x.sym !== 'X');
+    const funds = [...currentValues(currentHoldings())].filter(([, cur]) => cur > 0)
+      .map(([sym, cur]) => ({sym, cur})).sort((a, b) => b.cur - a.cur);
     const tot = funds.reduce((s, x) => s + x.cur, 0); if (!tot) return;
     S.targets = funds.map(x => ({sym: x.sym, pct: Math.round(x.cur / tot * 10000) / 100}));
     const diff = Math.round((100 - S.targets.reduce((s, t) => s + t.pct, 0)) * 100) / 100;
