@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Portfolio Rebalancer</title>
+<script>try{var t=JSON.parse(localStorage.getItem('rebal.theme'));if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: calm, exact money tool — a trade ticket, not a dashboard
+   IDEA: an order ticket you hand to the broker
+   PICTURE: the numbered order list, large, beside the inputs
+   COLOUR/TYPE: deep green header field, white working surface, coral for problems; Inter Tight + Inter
+   LAYOUT: inputs left, live orders right (stacked under 900px) */
+:root{color-scheme:light dark;
+ --bg:light-dark(#ffffff,#121b18);--page:light-dark(#e9efec,#0a0f0d);--ink:light-dark(#10201c,#e3ece8);--mute:light-dark(#5b6b66,#93a39e);
+ --line:light-dark(#dbe3e0,#25332f);--field:light-dark(#f4f7f6,#16201d);--green:#00463c;--lime:#e6f5c8;
+ --acc:light-dark(#00695a,#7fd6b8);--warn:#ff6f59;--ok:light-dark(#1d7a3e,#7fd69b)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--page);color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif;overflow-x:clip}
+h1,h2{font-family:"Inter Tight",Inter,sans-serif;line-height:1.1;margin:0}
+h1{font-size:clamp(30px,5vw,44px);text-wrap:balance}
+h2{font-size:20px;margin-bottom:10px}
+header{position:relative;overflow:hidden;background:radial-gradient(120% 140% at 100% 0%,#0b6b5a 0%,var(--green) 55%,#003129 100%);color:#fff;padding:clamp(26px,4vw,48px) max(4vw,16px) 0}
+.hwrap{max-width:1320px;margin:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center}
+header h1{font-size:clamp(30px,4.6vw,50px);letter-spacing:-.01em;max-width:22ch;text-wrap:balance}
+.scope{list-style:none;display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0;padding:0}
+.scope li{padding:5px 12px;border-radius:99px;background:rgba(230,245,200,.12);border:1px solid rgba(230,245,200,.28);color:var(--lime);font-size:14px;font-weight:500;white-space:nowrap}
+.themesw{position:absolute;z-index:3;top:16px;right:max(4vw,16px);display:flex;gap:2px;padding:3px;border-radius:99px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14)}
+.themesw button{display:grid;place-items:center;width:32px;height:32px;min-height:32px;padding:0;border:0;border-radius:99px;background:transparent;color:rgba(255,255,255,.7)}
+.themesw button:hover{color:#fff}
+.themesw button[aria-pressed=true]{background:var(--lime);color:var(--green)}
+.themesw svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.hsub{margin:10px 0 0;font-size:clamp(15px,1.6vw,18px);color:var(--lime);max-width:46ch}
+.howto{display:flex;align-items:center;margin:12px 0 0;font-size:14px;color:rgba(255,255,255,.75)}
+.tabhow{display:flex;align-items:center;margin:12px 2px 0;font-size:14px;color:var(--mute)}
+.tabhow b{color:var(--ink);font-weight:600}
+.hart{width:clamp(150px,22vw,240px);height:auto;overflow:visible}
+.hb-before rect{fill:rgba(255,255,255,.22)}
+.hb-after rect{fill:var(--lime)}
+.harrow{fill:none;stroke:var(--lime);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.hbase{stroke:rgba(255,255,255,.35);stroke-width:1.5}
+
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:28px;padding:24px max(4vw,16px) 48px;max-width:1320px;margin:auto}
+@media(max-width:900px){main{grid-template-columns:minmax(0,1fr)}}
+section{background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:22px 22px 24px;margin-bottom:18px;box-shadow:0 1px 3px rgba(16,32,28,.06),0 6px 18px rgba(16,32,28,.04)}
+section h2{padding-bottom:12px;margin-bottom:14px;border-bottom:2px solid var(--line)}
+.results{align-self:start}
+@media(min-width:601px){
+ table.hold .sym{width:6.6em}
+ table.hold td:first-child .cwrap .clear{display:none}
+ table.hold td:first-child .cwrap input{padding-right:8px}
+ table.hold td:first-child .cwrap:focus-within input:not(:placeholder-shown){padding-right:30px}
+ table.hold td:first-child .cwrap:focus-within input:not(:placeholder-shown)~.clear{display:grid}
+}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{font-size:13px;font-weight:600;color:var(--mute);text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
+td{padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+.num{text-align:right;white-space:nowrap}
+input,select,button{font:inherit;font-size:16px;color:inherit}
+input[type=text],input[type=number],input:not([type]),select{width:100%;min-height:40px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--field)}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+input:disabled{opacity:.75}
+input.n{text-align:right}
+button{min-height:40px;padding:6px 14px;border-radius:6px;border:1px solid var(--line);background:var(--field);cursor:pointer;font-weight:500}
+button.pri{background:var(--green);color:#fff;border-color:var(--green)}
+button.x{display:inline-grid;place-items:center;min-height:40px;width:40px;padding:0;border:0;border-radius:8px;background:none;color:var(--mute)}
+button.x:hover{color:var(--warn)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.row>label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mute);flex:1 1 140px}
+.row>label.chk{flex-direction:row;align-items:center;font-size:15px;color:var(--ink)}
+.status{font-size:14px;margin-top:8px}
+.bad{color:var(--warn)}.good{color:var(--ok)}
+.summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:6px 0 16px}
+.summary div{background:var(--field);border-radius:8px;padding:10px 12px}
+.summary b{display:block;font:700 clamp(20px,3vw,28px)/1.1 "Inter Tight",sans-serif}
+.summary span{font-size:13px;color:var(--mute)}
+ol.orders{list-style:none;margin:0;padding:0;counter-reset:o}
+ol.orders li{counter-increment:o;display:grid;grid-template-columns:2.2em minmax(0,1fr);gap:8px 10px;padding:14px 0;border-bottom:1px solid var(--line);align-items:start}
+.ohead{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:14px;color:var(--mute)}
+.chips{grid-column:2;display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:flex;flex-direction:column;align-items:flex-start;min-width:7.5em;min-height:56px;padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:var(--field);font:600 18px/1.2 Inter,sans-serif;font-variant-numeric:tabular-nums;text-align:left}
+.chip{position:relative}
+.chip small{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;font:500 12px Inter,sans-serif;color:var(--mute)}
+.ci{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.75}
+.ci-ok{display:none;color:var(--acc);opacity:1}
+.chip.used .ci-copy{display:none}.chip.used .ci-ok{display:block}
+.taphint{display:flex;align-items:center;gap:6px;margin:0 0 4px;font-size:14px;color:var(--mute)}
+.taphint .ci{opacity:1}
+.chip.used{border-color:var(--acc);background:light-dark(#eaf6f2,#14302a)}
+
+footer{padding:20px max(4vw,16px) 32px;max-width:1320px;margin:auto;font-size:13px;color:var(--mute);border-top:1px solid var(--line)}
+footer p{margin:0;max-width:90ch}
+.linkbtn{display:inline;min-height:0;padding:0;border:0;background:none;color:var(--acc);font:inherit;font-weight:600;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.ack{flex:none;padding:12px 20px 16px;border-top:1px solid var(--line)}
+.ack button{width:100%;min-height:48px;border:0;border-radius:10px;background:var(--green);color:#fff;font-weight:600;font-size:16px}
+@media(max-width:600px){.ack{padding:12px 18px calc(14px + env(safe-area-inset-bottom))}}
+ol.orders li::before{content:counter(o);font:700 22px "Inter Tight",sans-serif;color:var(--acc)}
+.otype{font-size:12px;font-weight:600;text-transform:none;padding:2px 8px;border-radius:99px;background:var(--lime);color:var(--green);margin-right:6px}
+.otype.buy{background:#d8ecff;color:#0b4f8a}.otype.sell{background:#ffe1db;color:#9a2a17}
+
+.msgs{margin:0 0 12px;padding-left:18px;font-size:14px}
+.empty{color:var(--mute);padding:18px 0}
+.drop{border:1px dashed var(--line);border-radius:8px;padding:12px;text-align:center;font-size:14px;color:var(--mute)}
+.scroll{overflow-x:auto}
+.sym{width:7.5em}
+.hidden{display:none}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+button,.filebtn,.chip{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+button,.filebtn{min-height:44px}
+button:active,.filebtn:active{transform:scale(.98)}
+.filebtn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:8px 16px;border-radius:8px;border:1px solid var(--line);background:var(--field);font-weight:600;cursor:pointer;overflow:hidden}
+.filebtn.pri{background:var(--green);color:#fff;border-color:var(--green);width:100%;min-height:52px;font-size:17px}
+.row>label.filebtn{flex:0 1 auto;flex-direction:row;font-size:16px;color:var(--ink);gap:0}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+.drop{border:0;padding:0}
+.chip{transition:background .15s,border-color .15s}
+.chip:active{transform:scale(.97)}
+.mbar{display:none}
+.info{display:inline-grid;place-items:center;position:relative;width:17px;height:17px;min-height:17px;padding:0;margin-left:5px;border-radius:50%;border:1px solid currentColor;background:transparent;color:var(--mute);opacity:.6;font:italic 600 11px/1 Georgia,serif;vertical-align:middle;flex:none;transition:opacity .15s,color .15s}
+.info:hover,.info:focus-visible{opacity:1}
+.info::after{content:"";position:absolute;inset:-13px}
+.info[aria-expanded=true]{opacity:1;color:var(--acc)}
+header .info{color:var(--lime)}header .info[aria-expanded=true]{color:#fff}
+.infobox{display:none!important;margin:10px 0 4px;padding:12px 14px;border-radius:8px;background:light-dark(#eef6f3,#13221e);border-left:3px solid var(--acc);font-size:15px;line-height:1.5;color:var(--ink)}
+.infobox p{margin:0 0 8px}.infobox p:last-child,.infobox ul:last-child{margin-bottom:0}
+.infobox ul{margin:0 0 8px;padding-left:20px}.infobox li{margin:3px 0}
+.modal{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(6,20,17,.45)}
+.modal.open{display:flex}
+.sheet{position:relative;display:flex;flex-direction:column;width:min(480px,100%);max-height:min(80vh,680px);overflow:hidden;background:var(--bg);color:var(--ink);border-radius:14px;padding:0;box-shadow:0 20px 50px rgba(0,0,0,.3);font-size:15px;line-height:1.55;animation:pop .16s ease-out}
+.shead{flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 14px 12px 20px;border-bottom:1px solid transparent}
+.shead.shadow{border-bottom-color:var(--line);box-shadow:0 4px 10px -8px rgba(0,0,0,.25)}
+.sbody{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px 20px 22px}
+.sheet h3{font:700 18px/1.25 "Inter Tight",Inter,sans-serif;margin:8px 0 0}
+.sheet p{margin:0 0 10px}.sheet ul{margin:0 0 10px;padding-left:20px}.sheet li{margin:4px 0}.sbody>:last-child{margin-bottom:0}
+.sheet .close{flex:none;width:40px;height:40px;min-height:40px;padding:0;border:0;border-radius:50%;background:var(--field);font-size:22px;line-height:1;color:var(--mute)}
+@keyframes pop{from{opacity:0;transform:translateY(8px) scale(.98)}}
+@media(max-width:600px){.modal{align-items:flex-end;padding:0}.sheet{width:100%;max-height:80vh;border-radius:16px 16px 0 0;padding:0;animation:up .2s ease-out}.sbody{padding:2px 18px calc(24px + env(safe-area-inset-bottom))}.shead{padding:16px 12px 12px 18px}}
+@keyframes up{from{transform:translateY(100%)}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.lbl{display:flex;align-items:center}
+.adorn{position:relative;display:block}
+.adorn::before{content:attr(data-u);z-index:1;position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--mute);pointer-events:none;font-size:16px}
+.adorn input{padding-left:24px}
+.adorn.suf::before{left:auto;right:10px}
+.adorn.suf input{padding-left:8px;padding-right:26px}
+.sym{text-transform:uppercase}
+.sub{margin-top:18px;border:1px solid var(--line);border-radius:12px;background:light-dark(#f8faf9,#141e1b)}
+.sub>summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:52px;padding:10px 14px;cursor:pointer;border-radius:12px;font-weight:600}
+.sub>summary::-webkit-details-marker{display:none}
+.sub>summary:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.si{width:18px;height:18px;flex:none;fill:none;stroke:var(--acc);stroke-width:2;stroke-linejoin:round}
+.sc{font-weight:500;font-size:13px;color:var(--mute)}
+.chev{width:20px;height:20px;margin-left:auto;flex:none;fill:none;stroke:var(--mute);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}
+.sub[open]>summary .chev{transform:rotate(180deg)}
+.sub[open]>summary{border-bottom:1px solid var(--line);border-radius:12px 12px 0 0}
+.subin{padding:4px 14px 16px}
+.pgrid{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"l l" "f b";gap:6px 8px;align-items:center;margin-top:14px}
+.plbl{grid-area:l;font-size:13px;color:var(--mute)}
+.pfield{grid-area:f}
+.pgrid .pbtns{grid-area:b}
+.pbtns{display:flex;gap:8px}
+.pbtns button,.pbtns .filebtn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;min-width:7.2em;padding:8px 14px;border-radius:8px;font-weight:600;font-size:15px}
+.bi{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+button.pri{background:var(--green);border-color:var(--green);color:#fff}
+button.danger{color:light-dark(#b3361f,#ff9a87)}
+button.danger:hover{border-color:currentColor}
+.pfiles{margin-top:18px;padding-top:14px;border-top:1px dashed var(--line)}
+.pfiles .lbl{font-size:13px;color:var(--mute);margin-bottom:6px}
+.pbtns.two{display:grid;grid-template-columns:1fr 1fr}
+.pconfirm{margin:8px 0 0;padding:8px 10px;border-radius:8px;background:light-dark(#fff1ee,#2b1a16);font-size:14px}
+.pmsg{margin:8px 0 0;font-size:13px;color:var(--ok);min-height:0}
+.pmsg:empty{display:none}
+@media(max-width:600px){.pgrid{grid-template-columns:minmax(0,1fr);grid-template-areas:"l" "f" "b"}.pgrid .pbtns>*{flex:1 1 0}}
+.optgroup{margin:22px 0 2px;padding-top:16px;border-top:1px solid var(--line);font:700 14px/1.2 "Inter Tight",Inter,sans-serif;color:var(--mute);text-transform:none;letter-spacing:.01em}
+.chk input[type=checkbox]{flex:none;margin-right:8px}
+.cv{display:block;max-width:100%;overflow:hidden;white-space:nowrap}
+.summary b{overflow:hidden;white-space:nowrap}
+.summary span{display:block;overflow:hidden;white-space:nowrap}
+#orderBtns>button:not(.info){overflow:hidden;white-space:nowrap}
+.tt{overflow:hidden;white-space:nowrap}
+#mbarText{overflow:hidden;white-space:nowrap;min-width:0}
+input.invalid{border-color:var(--warn)!important;box-shadow:0 0 0 1px var(--warn);color:light-dark(#b3361f,#ff9a87)}
+body[data-mode=etf] .mf-only,body:not([data-mode=etf]) .etf-only{display:none!important}
+.tabwrap{max-width:1320px;margin:0 auto;padding:0 max(4vw,16px)}
+.tabs{position:relative;max-width:1320px;margin:clamp(24px,3vw,36px) auto 0;display:flex;gap:16px;align-items:flex-end}
+.tabs button{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:12px;align-items:center;text-align:left;min-width:270px;padding:13px 20px 15px 16px;border:0;border-radius:14px 14px 0 0;background:rgba(255,255,255,.07);color:rgba(255,255,255,.82);transition:background .15s,color .15s}
+.tabs button:hover{background:rgba(255,255,255,.13);color:#fff}
+.tabs button:active{transform:none}
+.tabs button:focus-visible{outline:2px solid var(--lime);outline-offset:-4px}
+.ti{grid-row:1/3;width:34px;height:34px;padding:7px;border-radius:10px;background:rgba(230,245,200,.12);fill:none;stroke:var(--lime);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tt{font:700 16px/1.2 "Inter Tight",Inter,sans-serif}
+.ts{font-size:13px;line-height:1.3;opacity:.72}
+.tabs button[aria-selected=true]{background:var(--page);color:var(--ink);padding-bottom:17px;margin-bottom:-1px}
+.tabs button[aria-selected=true] .ti{background:var(--green);stroke:#fff}
+.tabs button[aria-selected=true] .ts{opacity:1;color:var(--mute)}
+.tabs button[aria-selected=true]::before,.tabs button[aria-selected=true]::after{content:"";position:absolute;bottom:0;width:14px;height:14px;background:transparent;pointer-events:none}
+.tabs button[aria-selected=true]::before{left:-14px;border-bottom-right-radius:14px;box-shadow:5px 5px 0 5px var(--page)}
+.tabs button[aria-selected=true]::after{right:-14px;border-bottom-left-radius:14px;box-shadow:-5px 5px 0 5px var(--page)}
+.tabs button:first-child[aria-selected=true]::before{display:none}
+.tabhow{margin-top:16px!important}
+.phase{display:flex;align-items:center;gap:8px;margin:18px 0 2px;font:700 15px/1.2 "Inter Tight",Inter,sans-serif;color:var(--ink)}
+.phase span{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--green);color:#fff;font-size:13px}
+#orders2,#orders3{counter-reset:none}
+.phnote{margin:2px 0 4px;font-size:13px;color:var(--mute)}
+.msgs li.warnline{color:light-dark(#8a5300,#f2c879)}
+.phnote.warnnote{padding:8px 10px;border-radius:8px;background:light-dark(#fff6e5,#2a2213);color:light-dark(#7a4b00,#f2c879)}
+.onote{grid-column:1/-1;margin:2px 0 0;padding:8px 10px;border-radius:8px;background:light-dark(#fff6e5,#2a2213);color:light-dark(#7a4b00,#f2c879);font-size:13px;line-height:1.4}
+.afterblock{margin:14px 0 4px;padding:14px;border-radius:12px;background:light-dark(#f2f8f5,#16231f);border:1px dashed light-dark(#b9d3c9,#2c4840)}
+.afterblock label{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--mute)}
+.afterblock .note{margin:6px 0 0;font-size:13px;color:var(--acc)}
+#orderBtns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:stretch}
+#orderBtns>.info{align-self:center}
+#orderBtns>button:not(.info){width:100%}
+#copyOrders{grid-row:1;grid-column:1/3}
+#clearCopied{grid-row:2;grid-column:1}#dlOrders{grid-row:2;grid-column:2}
+#orderBtns>.info{grid-row:1;grid-column:3}
+#copyMsg{grid-column:1/-1;margin:0}#copyMsg:empty{display:none}
+button:disabled{opacity:.45;cursor:default}
+.allocwrap{container-type:inline-size;overflow-x:auto}
+@container (max-width:600px){table.alloc .wide{display:none}table.alloc td,table.alloc th{padding:8px 4px}}
+.cwrap{position:relative;display:block}
+.clear{position:absolute;right:7px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:24px;height:24px;min-height:24px;padding:0;border:0;border-radius:50%;background:var(--line);color:var(--mute);font-size:16px;line-height:1;cursor:pointer}
+.clear::after{content:"";position:absolute;inset:-9px}
+.clear:active{transform:translateY(-50%) scale(.92)}
+.cwrap input:placeholder-shown~.clear,.cwrap input:disabled~.clear{display:none}
+.cwrap:not(.f) input{padding-right:38px}
+.cwrap.f .clear{display:none}
+.cwrap.f:focus-within input:not(:placeholder-shown)~.clear{display:grid}
+.cwrap.f:focus-within input{padding-right:26px}
+.cwrap.f .clear{right:4px;width:20px;height:20px;min-height:20px;font-size:14px}
+.adorn.suf.hasclr::before{right:40px}
+.adorn.suf.hasclr input{padding-right:56px}
+table.hold td{padding:4px 3px}table.hold .sym{width:5.6em}table.hold .adorn input{padding-left:20px;padding-right:6px}table.hold .adorn::before{left:7px}
+.combo{display:grid;grid-template-columns:minmax(0,1fr) 5.5em;gap:6px}
+h2{display:flex;align-items:center}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}button:active,.chip:active,.filebtn:active{transform:none}}
+@media(max-width:600px){
+ header{padding:60px 16px 0}
+ .themesw{top:14px;right:14px}
+ header h1{font-size:30px;max-width:none}
+ .hwrap{grid-template-columns:minmax(0,1fr)}
+ .hart{display:none}
+ .scope{gap:6px;margin-top:14px}.scope li{font-size:13px;padding:4px 10px}
+ main{padding:16px 14px 8px;gap:8px}
+ .tabwrap{padding:0 14px}
+ .tabs{margin-top:20px;gap:12px}
+ .tabs button[aria-selected=true]::before,.tabs button[aria-selected=true]::after{width:10px;height:10px}
+ .tabs button[aria-selected=true]::before{left:-10px;border-bottom-right-radius:10px}
+ .tabs button[aria-selected=true]::after{right:-10px;border-bottom-left-radius:10px}
+ .tabs button:last-child[aria-selected=true]::after{display:none}
+ .tabs button{flex:1 1 0;min-width:0;grid-template-columns:minmax(0,1fr);padding:11px 12px 13px;row-gap:2px}
+ .tabs button[aria-selected=true]{padding-bottom:15px}
+ .ti{grid-row:auto;width:28px;height:28px;padding:5px;margin-bottom:4px;border-radius:8px}
+ .tt{font-size:15px}
+ .ts{font-size:12px}
+ #pctTotal{flex:1 1 100%;margin-top:0}
+ .row>label.filebtn{flex:1 1 0}
+ .mbar{transition:opacity .2s,transform .2s}
+ .mbar.off{opacity:0;transform:translateY(20px);pointer-events:none}
+ section{padding:18px 14px 20px;border-radius:14px;margin-bottom:14px}
+ section h2{margin-bottom:12px}
+ h2{font-size:19px}
+ .row{gap:10px}
+ .row>label{flex:1 1 100%}
+ .row>button,.row>.filebtn:not(.pri){flex:1 1 0}
+ .row>button.info{flex:none;min-height:17px}
+ .row>label.chk{flex:1 1 100%;min-height:44px}
+ input[type=checkbox]{width:22px;height:22px}
+ input[type=text],input:not([type]),select{min-height:46px;border-radius:8px}
+ table.hold thead{display:none}
+ table.hold tr{position:relative;display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,.94fr) minmax(0,1.04fr);grid-template-areas:"sym sym sym" "s p v";gap:10px 8px;padding:12px;margin-bottom:10px;background:var(--field);border-radius:10px}
+ table.hold td{border:0;padding:0;display:block}
+ table.hold td:nth-child(1){grid-area:sym}
+ table.hold td.del{position:absolute;top:12px;right:8px}
+ table.hold td:nth-child(1){padding-right:48px}
+ table.hold td.del .x{width:44px;height:44px;margin-top:22px;display:grid;place-items:center;border-radius:8px}
+ table.hold td:not(.del)::before{content:attr(data-l);display:block;font-size:12px;line-height:16px;height:16px;color:var(--mute);margin-bottom:6px}
+ table.hold td:nth-child(2){grid-area:s}table.hold td:nth-child(3){grid-area:p}table.hold td:nth-child(4){grid-area:v}
+ table.hold input{background:var(--bg)}
+ table.hold .sym{width:100%;font-weight:600}
+ table.hold input[data-f=value],table.hold input[data-f=shares]{font-size:14px;letter-spacing:-.01em}
+ table.hold .adorn input{padding-left:18px}
+ table.hold .adorn::before{left:6px;font-size:14px}
+ .sym{width:6.5em}
+ .summary{gap:6px}
+ .summary div{padding:8px 10px}
+ .summary b{font-size:18px}
+ .summary span{font-size:12px}
+ ol.orders li{grid-template-columns:1.5em minmax(0,1fr);gap:8px 8px}
+ .chips{grid-column:1/3;display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:6px}
+ .chip{min-width:0;min-height:62px;padding:8px 10px;font-size:19px;border-radius:10px}
+ table.alloc{font-size:14px}
+ table.alloc .wide{display:none}
+ table.alloc td,table.alloc th{padding:8px 4px}
+ .mbar{display:flex;position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:5;justify-content:space-between;align-items:center;gap:10px;min-height:52px;padding:10px 16px;border-radius:12px;background:var(--green);color:#fff;text-decoration:none;font-size:15px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+ .mbar b{color:var(--lime);white-space:nowrap}
+ footer{padding-bottom:90px}
+}
+</style>
+</head>
+<body>
+<header>
+ <div class="themesw" role="group" aria-label="Color theme">
+  <button type="button" data-theme-set="system" aria-pressed="true" title="Match system"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg><span class="sr">System</span></button>
+  <button type="button" data-theme-set="light" aria-pressed="false" title="Light"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><span class="sr">Light</span></button>
+  <button type="button" data-theme-set="dark" aria-pressed="false" title="Dark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><span class="sr">Dark</span></button>
+ </div>
+ <div class="hwrap">
+  <div class="htext">
+   <h1>Portfolio rebalancer</h1>
+   <p class="hsub">Rebalancing tools for mutual fund, ETF, and stock portfolios. Works with Fidelity positions files.</p>
+   <div class="infobox" id="i-which"><p>This page has two tools. Pick the tab that matches the account you're rebalancing.</p>
+ <p><b>Mutual funds only</b>, when every holding is a mutual fund from one fund family and they can be exchanged with each other without fees, such as Fidelity funds in an HSA or IRA. Rebalancing is done with exchanges, which sell one fund and buy another in a single order at the same day's closing price. It takes the fewest orders and leaves no cash waiting to settle.</p>
+ <p><b>Mixed portfolio</b>, for everything else:</p>
+ <ul><li>Accounts with ETFs or individual stocks, with or without mutual funds.</li>
+ <li>Accounts that hold only mutual funds, but from different fund families or with fees to exchange. Use this tab with <b>Mutual funds here can be exchanged with each other</b> turned off, and each fund is sold to cash or bought with cash on its own.</li></ul>
+ <p>Each tab has its own holdings, targets, saved presets, and <b>How this tool works</b> guide.</p></div>
+   <p class="howto">Which tool should I use? <button type="button" class="info" data-info="i-which" aria-expanded="false" aria-label="Which tool to use">i</button></p>
+  </div>
+  <svg class="hart" viewBox="0 0 200 120" aria-hidden="true">
+   <g class="hb-before"><rect x="8" y="34" width="16" height="70" rx="3"/><rect x="30" y="72" width="16" height="32" rx="3"/><rect x="52" y="52" width="16" height="52" rx="3"/><rect x="74" y="88" width="16" height="16" rx="3"/></g>
+   <path class="harrow" d="M100 60h16m-6-6 6 6-6 6"/>
+   <g class="hb-after"><rect x="126" y="44" width="16" height="60" rx="3"/><rect x="148" y="62" width="16" height="42" rx="3"/><rect x="170" y="74" width="16" height="30" rx="3"/></g>
+   <line class="hbase" x1="4" y1="106" x2="196" y2="106"/>
+  </svg>
+ </div>
+ <div class="infobox" id="i-about-etf"><p><b>For a mix of ETFs, individual stocks, and mutual funds in one Fidelity account.</b> Stocks and ETFs are traded in dollars (or in whole shares, for accounts without fractional trading); mutual funds are exchanged with each other where possible. Built with Fidelity in mind; the positions upload reads Fidelity's file only.</p>
+ <p>ETFs and stocks trade all day at changing prices, while mutual funds trade once a day at the closing price. So the plan comes in up to three steps:</p>
+ <ul><li><b>Sell ETFs &amp; stocks</b> that are above target.</li>
+ <li><b>Mutual fund orders:</b> exchanges between funds, plus any fund sales or purchases, placed before the market closes.</li>
+ <li><b>Buy ETFs &amp; stocks</b> that are below target, in dollars, so every dollar of cash is invested.</li></ul>
+ <p>Before you start, download a fresh positions file during market hours so prices are current. After the sells, you can enter the cash you actually have and the final buys resize to match.</p>
+ <p>For an account that holds only exchangeable mutual funds, the <b>Mutual funds only</b> tab is simpler. Each tab keeps its own holdings, targets, and presets. Everything runs in your browser. This is an independent calculator, not investment advice; see <b>Full disclosures</b> at the bottom of the page.</p></div>
+ <div class="infobox" id="i-about"><p><b>Only for exchanges between mutual funds in one fund family, within one account.</b> It can't plan trades in ETFs or stocks, moves between different fund families, or transfers between accounts. For ETFs, stocks, a mix, or mutual funds that can't be exchanged with each other, use the <b>Mixed portfolio</b> tab.</p>
+ <p>It's built with Fidelity funds in mind, but it works for any account that holds only mutual funds from one fund family that can be exchanged without fees. The positions upload reads Fidelity's file only; for any other account, type the holdings in by hand.</p>
+ <p>You enter what you own now and the mix you want. The tool works out the fewest orders that get you there and invests all of your cash (or keeps the cash amount you set).</p>
+ <ul><li><b>Step 1:</b> load your current holdings, usually by uploading Fidelity's positions CSV.</li>
+ <li><b>Step 2:</b> set your target percentage for each fund.</li>
+ <li><b>Step 3:</b> adjust the options if you need to.</li>
+ <li><b>Step 4:</b> enter the orders in Fidelity, tapping each box to copy its value.</li></ul>
+ <p>The orders are mostly <b>exchanges</b>: one order that sells one mutual fund and buys another in the same fund family, with both sides priced at the same day's close, so no cash is left waiting to settle. Leftover cash is invested with plain buys. Exchanges only work between funds in the same family and the same account. Anything else needs a separate sell, then a buy once the sale settles, which this tool doesn't plan.</p>
+ <p>Everything runs in your browser. Your positions file is never uploaded anywhere. This is an independent calculator, not investment advice; see <b>Full disclosures</b> at the bottom of the page.</p></div>
+ <nav class="tabs" role="tablist" aria-label="Choose a tool"><button role="tab" type="button" data-tab="mf" aria-selected="true"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/></svg><span class="tt">Mutual funds only</span><span class="ts">Exchanges within one fund family</span></button><button role="tab" type="button" data-tab="etf" aria-selected="false"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="3.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="3.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg><span class="tt">Mixed portfolio</span><span class="ts">Stocks, ETFs, and mutual funds</span></button></nav>
+</header>
+<div class="tabwrap"> <p class="tabhow"><span>How the <b id="tabName">Mutual funds only</b> tool works</span><button type="button" class="info" data-info="i-about" aria-expanded="false" aria-label="How this tool works">i</button></p></div>
+
+<main>
+<div class="inputs">
+ <section>
+  <h2>1. Current holdings <button type="button" class="info" data-info="i-hold" aria-expanded="false" aria-label="About current holdings">i</button></h2>
+  <div class="infobox" id="i-hold-etf"><p>List every position in the account. The easiest way is to upload Fidelity's positions file; you can also type holdings in or edit anything after uploading.</p>
+  <ul><li><b>Symbol:</b> the ticker of the stock, ETF, or mutual fund, such as AAPL, VTI, or FZROX. Any five-letter symbol ending in X is treated as a mutual fund; everything else is treated as a stock or ETF.</li>
+  <li><b>Shares:</b> how many shares you own, including fractions.</li>
+  <li><b>Price:</b> the current price per share. Stock and ETF prices change all day, so download the positions file right before trading, or type in fresh prices. Mutual fund prices are the last close.</li>
+  <li><b>Value:</b> filled in automatically as shares × price. If you only know the dollar balance, leave Shares blank and type the value.</li>
+  <li>The <b>trash can</b> removes a row, and <b>+ Add holding</b> adds one. The small <b>×</b> inside a field clears it.</li></ul></div>
+  <div class="infobox" id="i-hold"><p>List every position in the account. The easiest way is to upload Fidelity's positions file; you can also type holdings in or edit anything after uploading.</p>
+  <ul><li><b>Symbol:</b> the fund's ticker, such as FXAIX. Mutual fund tickers are five letters ending in X; anything else is flagged in red, since stocks and ETFs belong in the Mixed portfolio tab.</li>
+  <li><b>Shares:</b> how many shares you own. Fidelity shows mutual fund shares to 3 decimals.</li>
+  <li><b>Price:</b> the fund's last closing price (NAV) per share. Mutual funds price once a day, after the market closes.</li>
+  <li><b>Value:</b> filled in automatically as shares × price. If you only know the dollar balance, leave Shares blank and type the value. Orders out of that fund will then be in dollars instead of shares.</li>
+  <li>The <b>trash can</b> removes a row, and <b>+ Add holding</b> adds one. The small <b>×</b> inside a field clears it.</li></ul>
+  <p>Funds you hold but leave out of the target portfolio will be sold completely.</p></div>
+  <div class="drop" id="drop">
+   <label class="filebtn pri">Upload Fidelity positions CSV<input type="file" id="csvFile" accept=".csv,text/csv"></label>
+  </div>
+  <div class="row" style="margin-top:6px"><span class="lbl" style="font-size:14px;color:var(--mute)">Where do I get this file? <button type="button" class="info" data-info="i-csv" aria-expanded="false" aria-label="About the Fidelity CSV">i</button></span></div>
+  <div class="infobox" id="i-csv-etf"><ul><li>On Fidelity.com, open <b>Positions</b>, then use the <b>Download</b> option on that page to save a CSV file.</li>
+  <li>Download it <b>during market hours, right before you trade</b>. The Last price column is the price at the moment you download, and the plan uses it.</li>
+  <li>If the file has more than one account, choose the one to rebalance from the <b>Account</b> list that appears.</li>
+  <li>The core money market (SPAXX, FDRXX, FZFXX, and similar, with or without **) is treated as cash and goes into <b>Cash in core position</b>.</li>
+  <li>The file is read in your browser only.</li></ul></div>
+  <div class="infobox" id="i-csv"><ul><li>On Fidelity.com, open <b>Positions</b> (for all accounts or just one), then use the <b>Download</b> option on that page to save a CSV file.</li>
+  <li>Upload it here. If the file has more than one account, choose the one to rebalance from the <b>Account</b> list that appears.</li>
+  <li>The core money market fund (such as SPAXX or FDRXX, often marked with **) is your cash. It goes into <b>Cash in core position</b>, not into the holdings list.</li>
+  <li>Prices come from the file's Last price column. During the trading day that's the previous close, which is what the plan should use.</li>
+  <li>Any <b>Pending activity</b> row goes into the Pending activity field.</li>
+  <li>The file is read in your browser only. Download a fresh one each time so shares and prices are current.</li></ul></div>
+  <div class="row hidden" id="acctRow"><label>Account<select id="acctSel"></select></label></div>
+  <div class="scroll" style="margin-top:12px">
+   <table class="hold">
+    <thead><tr><th>Symbol</th><th class="num">Shares</th><th class="num">Price</th><th class="num">Value</th><th></th></tr></thead>
+    <tbody id="holdBody"></tbody>
+   </table>
+  </div>
+  <div class="status" id="priceStatus"></div>
+  <div class="row"><button id="addHold">+ Add holding</button></div>
+  <div class="row">
+   <label><span class="lbl">Cash in core position<button type="button" class="info" data-info="i-cash" aria-expanded="false" aria-label="About core cash">i</button></span><span class="adorn" data-u="$"><input id="cash" data-clr class="n" inputmode="decimal"></span></label>
+   <label><span class="lbl">New money to add<button type="button" class="info" data-info="i-new" aria-expanded="false" aria-label="About new money">i</button></span><span class="adorn" data-u="$"><input id="addCash" data-clr class="n" inputmode="decimal"></span></label>
+  </div>
+  <div class="infobox" id="i-cash"><p>Settled cash in the account's core money market position (SPAXX, FDRXX, etc.). The plan buys funds with it until it reaches the cash you've chosen to keep, which is zero by default. Buys use the core position directly, so this cash needs to be settled.</p></div>
+  <div class="infobox" id="i-new"><p>Any new contribution not in the positions file yet, such as a deposit you've just made. It's added to cash and invested along with everything else. Only place the buy orders once that money has settled in the account.</p></div>
+  <div class="row">
+   <label><span class="lbl">Pending activity<button type="button" class="info" data-info="i-pending" aria-expanded="false" aria-label="About pending activity">i</button></span><span class="adorn" data-u="$"><input id="pending" data-clr class="n" inputmode="decimal"></span></label>
+   <label class="chk"><input type="checkbox" id="incPending"> Count pending as cash</label>
+  </div>
+  <div class="infobox" id="i-pending"><p>Money moving in or out of the account that hasn't settled yet, taken from the positions file. A negative number is money leaving, such as a withdrawal or a trade being paid for.</p>
+  <p>It's left out by default because unsettled money usually can't be used for buys yet. Turn on <b>Count pending as cash</b> if it will have settled before you place the orders, or if it's money leaving that the plan needs to account for.</p></div>
+ </section>
+
+ <section>
+  <h2>2. Target portfolio <button type="button" class="info" data-info="i-target" aria-expanded="false" aria-label="About the target portfolio">i</button></h2>
+  <div class="infobox" id="i-target-etf"><ul><li>Enter each stock, ETF, or mutual fund you want to own and the percentage you want in it. Percentages must add up to 100%.</li>
+  <li>Percentages apply to the amount invested, after any cash you choose to keep below.</li>
+  <li>With <b>Sell and buy</b>, positions you hold but don't list here are sold completely. With <b>Buy only</b>, they're left alone.</li>
+  <li>Positions you list but don't hold yet are bought.</li>
+  <li><b>Use current mix</b> fills in your current holdings at their current percentages, as a starting point.</li></ul></div>
+  <div class="infobox" id="i-target"><ul><li>Enter each fund you want to own and the percentage you want in it. Fund percentages must add up to 100%.</li>
+  <li>Percentages apply to the amount invested, after any cash you choose to keep below. For example, with $10,000 and $500 kept as cash, 60% means 60% of $9,500.</li>
+  <li>Funds you hold but don't list here are sold completely.</li>
+  <li>Funds you list but don't hold yet are bought.</li>
+  <li><b>Use current mix</b> fills in your current holdings at their current percentages, which gives you a starting point to adjust.</li></ul></div>
+  <div class="scroll">
+   <table>
+    <thead><tr><th>Symbol</th><th class="num">Target %</th><th></th></tr></thead>
+    <tbody id="tgtBody"></tbody>
+   </table>
+  </div>
+  <div class="row">
+   <button id="addTgt">+ Add fund</button>
+   <button id="fromCur">Use current mix</button>
+   <span id="pctTotal" class="status"></span>
+  </div>
+  <div class="row">
+   <label><span class="lbl">Cash to keep<button type="button" class="info" data-info="i-reserve" aria-expanded="false" aria-label="About keeping cash">i</button></span>
+    <span class="combo"><span class="adorn" id="reserveAdorn" data-u="$"><input id="reserve" data-clr class="n" inputmode="decimal" placeholder="0" aria-label="Cash to keep"></span><select id="reserveMode" aria-label="Cash to keep unit"><option value="usd">$</option><option value="pct">%</option></select></span></label>
+  </div>
+  <div class="infobox" id="i-reserve"><p>Leave part of the portfolio in cash instead of investing all of it.</p>
+  <ul><li><b>$</b> keeps a fixed dollar amount.</li>
+  <li><b>%</b> keeps a percentage of the total portfolio value.</li></ul>
+  <p>Fund percentages are applied to whatever is left. If you want to keep more cash than you have now, the plan adds <b>Sell</b> orders that sell fund shares into the core position. Money from a sale usually takes about a business day to settle.</p>
+  <p>The cash setting is saved with your presets and export files.</p></div>
+  <details class="sub" id="presetBox">
+   <summary><svg class="si" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span class="st">Saved targets</span><span class="sc" id="presetCount"></span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+   <div class="subin">
+    <div class="pgrid">
+     <label for="presetSel" class="plbl"><span class="lbl">Load saved targets<button type="button" class="info" data-info="i-presets" aria-expanded="false" aria-label="About saved presets">i</button></span></label>
+     <select id="presetSel" class="pfield"></select>
+     <div class="pbtns"><button id="loadPreset" class="pri"><svg class="bi" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v1"/><path d="M3.5 19 6 11h15l-2.5 8z"/></svg>Load</button><button id="delPreset" class="danger"><svg class="bi" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>Delete</button></div>
+    </div>
+    <p class="pconfirm hidden" id="delConfirm">Delete <b id="delName"></b>? <button type="button" id="delYes" class="linkbtn">Delete</button> · <button type="button" id="delNo" class="linkbtn">Cancel</button></p>
+    <div class="pgrid">
+     <label for="presetName" class="plbl"><span class="lbl">Save current targets as</span></label>
+     <div class="pfield"><input id="presetName" data-clr placeholder="e.g. Roth IRA 80/20"></div>
+     <div class="pbtns"><button id="savePreset" class="pri"><svg class="bi" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/></svg>Save</button></div>
+    </div>
+    <p class="pmsg" id="presetMsg" aria-live="polite"></p>
+    <div class="pfiles">
+     <span class="lbl">Backup or move to another device<button type="button" class="info" data-info="i-files" aria-expanded="false" aria-label="About export and import">i</button></span>
+     <div class="pbtns two"><button id="exportTgt"><svg class="bi" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m-4 4 4-4 4 4"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>Export file</button><label class="filebtn"><svg class="bi" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>Import file<input type="file" id="importTgt" accept=".json,.csv,application/json,text/csv"></label></div>
+    </div>
+   </div>
+  </details>
+  <div class="infobox" id="i-presets"><ul><li><b>Save</b> stores the current target percentages and cash setting under the name you type. Saving with an existing name replaces it.</li>
+  <li><b>Load</b> replaces the current targets with the preset you pick. <b>Delete</b> removes it (you'll be asked to confirm).</li>
+  <li>Presets live in this browser only. Another device or browser won't see them, and clearing your browsing data deletes them. Use Export file for a backup.</li><li>The Mutual funds only and Mixed portfolio tabs keep separate presets.</li></ul></div>
+  <div class="infobox" id="i-files"><ul><li><b>Export file</b> downloads a .json file with the preset name, target percentages, and cash setting. Use it as a backup or to move targets to another device.</li>
+  <li><b>Import file</b> accepts that .json file, or a simple .csv with one fund per line: <code>symbol,percent</code> (for example <code>FXAIX,60</code>). A header row is fine. Importing replaces the current targets.</li></ul></div>
+ </section>
+
+ <section>
+  <h2>3. Options</h2>
+  <div class="row etf-only">
+   <label><span class="lbl">Rebalance method<button type="button" class="info" data-info="i-method" aria-expanded="false" aria-label="About the rebalance method">i</button></span><select id="method"><option value="full">Sell and buy</option><option value="buyonly">Buy only with cash</option></select></label>
+  </div>
+  <div class="infobox" id="i-method"><ul><li><b>Sell and buy:</b> moves every position to its target. Positions above target are sold or exchanged, and the cash buys the ones below. Positions not in the target are sold completely.</li>
+  <li><b>Buy only with cash:</b> never sells. It puts your cash (including new money) into the positions furthest below target, bringing them as close to target as the cash allows. Positions not in the target are left alone.</li></ul>
+  <p>In a taxable account, <b>Buy only</b> avoids realizing capital gains, which makes it a good choice when you're adding money. Use Sell and buy when the portfolio has drifted too far for new cash to fix.</p></div>
+  <div class="row">
+   <label><span class="lbl">Leave positions alone if within<button type="button" class="info" data-info="i-tol" aria-expanded="false" aria-label="About tolerance">i</button></span>
+    <span class="combo"><span class="adorn" id="tolAdorn" data-u="$"><input id="tol" data-clr class="n" inputmode="decimal" placeholder="0" aria-label="Tolerance"></span><select id="tolMode" aria-label="Tolerance unit"><option value="usd">$</option><option value="pct">%</option></select></span></label>
+  </div>
+  <div class="infobox" id="i-tol"><p>Skips funds that are already close to target, so you don't place tiny orders.</p>
+  <ul><li><b>$:</b> a fund within that many dollars of its target isn't traded.</li>
+  <li><b>%:</b> a fund within that many percentage points of the total portfolio isn't traded. For example, 1% on a $10,000 portfolio means within $100.</li></ul>
+  <p>The dollars a skipped fund would have moved go to the largest other buy instead, so cash still ends at your target. Funds being sold completely, and cash, are never skipped. Leave it at 0 for an exact rebalance.</p></div>
+  <div class="row mf-only">
+   <label><span class="lbl">Exchange amounts in<button type="button" class="info" data-info="i-units" aria-expanded="false" aria-label="About exchange amounts">i</button></span><select id="units"><option value="shares">Shares (recommended)</option><option value="dollars">Dollars</option></select></label>
+  </div>
+  <div class="infobox" id="i-units"><p>Every order fills at <b>today's</b> closing price, but the plan has to use the <b>last</b> close, so results always land a little off target.</p>
+  <ul><li><b>Shares (recommended):</b> each exchange sells a set number of shares. If the market moves today, what you sell moves with it, which keeps your mix closer to target.</li>
+  <li><b>Dollars:</b> each exchange moves a fixed dollar amount.</li></ul>
+  <p>Either way, buys from cash are in dollars, and the final order out of a fund being sold completely sells all shares, so nothing is left behind.</p></div>
+  <h3 class="optgroup etf-only">Mutual funds</h3>
+  <div class="row etf-only">
+   <label class="chk"><input type="checkbox" id="exch" checked> Can be exchanged with each other<button type="button" class="info" data-info="i-exch" aria-expanded="false" aria-label="About exchangeable mutual funds">i</button></label>
+  </div>
+  <div class="infobox" id="i-exch"><p>Turn this on when every mutual fund in the account is from the same fund family and can be exchanged without fees, such as all Fidelity funds.</p>
+  <ul><li><b>On:</b> the plan pairs mutual funds up, so a fund above target is exchanged straight into one below target. That means fewer orders and no waiting for a sale to settle.</li>
+  <li><b>Off:</b> each mutual fund is sold to cash or bought with cash separately. Use this when the funds come from different families or an exchange would cost a fee.</li></ul>
+  <p>Stocks and ETFs are always sold and bought separately, since they can't be exchanged.</p></div>
+  <div class="row etf-only">
+   <label><span class="lbl">Exchange and sale amounts in<button type="button" class="info" data-info="i-mfunits" aria-expanded="false" aria-label="About mutual fund order amounts">i</button></span><select id="mfUnits"><option value="shares">Shares (recommended)</option><option value="dollars">Dollars</option></select></label>
+  </div>
+  <div class="infobox" id="i-mfunits"><p>How mutual fund exchanges and sales are sized. Every mutual fund order fills at <b>today's</b> closing price, but the plan has to use the <b>last</b> close, so results always land a little off target.</p>
+  <ul><li><b>Shares (recommended):</b> each exchange or sale is a set number of shares. If the market moves today, what you sell moves with it, which keeps your mix closer to target.</li>
+  <li><b>Dollars:</b> each exchange or sale is a fixed dollar amount.</li></ul>
+  <p>Either way, mutual fund buys from cash are in dollars, and the final order out of a fund being sold completely sells all shares, so nothing is left behind.</p></div>
+  <h3 class="optgroup etf-only">Stocks &amp; ETFs</h3>
+  <div class="row etf-only" id="sellUnitsRow">
+   <label><span class="lbl">Orders in<button type="button" class="info" data-info="i-sellunits" aria-expanded="false" aria-label="About stock and ETF order amounts">i</button></span><select id="sellUnits"><option value="dollars">Dollars (recommended)</option><option value="shares">Fractional shares</option><option value="whole">Whole shares only</option></select></label>
+  </div>
+  <div class="infobox" id="i-sellunits"><p>How stock and ETF orders are sized. Mutual fund orders have their own setting under <b>Mutual funds</b>.</p>
+  <ul><li><b>Dollars (recommended):</b> sells and buys are dollar amounts. Sales bring back about the cash the plan expects, and buys invest every dollar. Needs fractional (dollar-based) trading, which Fidelity offers for most US stocks and ETFs.</li>
+  <li><b>Fractional shares:</b> sells are a share count (to 0.001 share), so the cash you get back varies with the fill price. Buys are still in dollars. Also needs fractional trading.</li>
+  <li><b>Whole shares only:</b> for accounts that <b>can't</b> trade fractional shares. Details below.</li></ul>
+  <p>With dollars or fractional shares, a position being sold completely is sold as all shares, and <b>large partial sales are always in shares</b>: when a sale is 80% or more of a position, a dollar amount could exceed what the position is worth if the price drops before the order fills, so it switches to a share count, which can never exceed what you own.</p>
+  <p><b>Whole shares only</b></p><p><b>Only for accounts that can't trade fractional shares,</b> for example an account where Fidelity's dollar-based (fractional) trading isn't enabled or isn't available. If your account can trade fractional shares, leave this off: dollar orders invest every dollar and land closer to target.</p>
+  <ul><li><b>Sells</b> are rounded to the nearest whole share. A sale of less than one share is skipped.</li>
+  <li><b>Positions being sold completely</b> are sold as all shares, including any fraction you already hold. This assumes your broker lets you close out an existing fractional position even without fractional trading. If it won't, sell the whole shares and contact your broker about the fraction.</li>
+  <li><b>Buys</b> are whole shares, each with a <b>limit price</b>. Place them as limit orders at that price. If the price climbs above it, the order simply won't fill instead of spending more than planned.</li>
+  <li>The plan adds up every buy at its limit price and makes sure the total can't exceed your cash, so market moves can't push you into a shortfall or, in a margin account, a margin loan.</li>
+  <li>Whole shares rarely add up exactly, so some cash is usually left over. The plan shows an estimate and warns you if it's more than 2% of the portfolio. Targets smaller than one share aren't bought.</li>
+  <li>Mutual fund orders aren't affected. Funds always trade in fractional shares at the closing price.</li></ul>
+  <p>For the closest result, enter the actual cash in <b>Cash available before final buys</b> once the sells have filled. The buys are recalculated from the real number.</p></div>
+  <div class="row etf-only hidden" id="cushRow">
+   <label><span class="lbl">Price cushion for whole-share trades<button type="button" class="info" data-info="i-cushion" aria-expanded="false" aria-label="About the price cushion">i</button></span><span class="adorn suf" data-u="%"><input id="cushion" data-clr class="n" inputmode="decimal" placeholder="0" aria-label="Price cushion percent"></span></label>
+  </div>
+  <div class="infobox" id="i-cushion"><p>Protects against prices moving between planning and trading.</p>
+  <ul><li><b>Buy limit prices</b> are set this far above the current price, and every buy is sized so the total stays within your cash even if each one fills at its limit.</li>
+  <li><b>Sale proceeds</b> are assumed to come in this much below current prices.</li></ul>
+  <p>A bigger cushion is safer but leaves more cash unspent. About 0.5% to 1% suits widely traded ETFs; use more for volatile stocks or a fast-moving market. If a limit order doesn't fill because the price moved past it, download fresh prices and recalculate.</p></div>
+ </section>
+</div>
+
+<div class="results">
+ <section>
+  <h2 id="ordersTop">Orders <button type="button" class="info" data-info="i-orders" aria-expanded="false" aria-label="How to use the orders">i</button></h2>
+  <div class="infobox" id="i-orders-etf"><p><b>Placing them:</b> tap any box to copy it, then paste it into Fidelity's trade ticket. Copied boxes get a check mark. The orders come in up to three steps:</p>
+  <ul><li><b>Sell ETFs &amp; stocks:</b> on the stock and ETF ticket, choose Sell and set the amount to Dollars or Shares as shown. Place these first. <b>All shares</b> sells the whole position.</li>
+  <li><b>Mutual fund orders:</b> on the mutual fund ticket. An <b>Exchange</b> sells one fund and buys another in a single order; a <b>Sell</b> goes to cash; a <b>Buy</b> uses cash. Place them before 4 p.m. Eastern (2 p.m. Mountain). They fill at that day's closing price, not right away.</li>
+  <li><b>Buy ETFs &amp; stocks:</b> once the sells have filled, choose Buy and set the amount to Dollars. If these buys depend on cash from a mutual fund sale, that cash only arrives after the close, so the plan tells you to place them the next business day.</li>
+  <li><b>≈ amount:</b> the estimated value at the prices entered.</li></ul>
+  <p><b>Order type:</b> Fidelity's dollar-based stock and ETF orders can be market or limit orders, good for the day only. For widely traded ETFs and large stocks a market order is usually fine; a limit order protects you from a bad fill on thinly traded ones.</p>
+  <p><b>Timing:</b> trade stocks and ETFs during regular market hours, 9:30 a.m. to 4 p.m. Eastern (7:30 a.m. to 2 p.m. Mountain). Avoid the first and last few minutes, when prices swing more. Place the sells and buys close together so prices don't drift much in between.</p>
+  <p><b>Settlement:</b> stock, ETF, and most mutual fund trades settle in one business day. Brokers often let you buy with sale proceeds before they settle, but in a cash account, selling the new shares before the original sale settles can cause a good faith violation. Check your broker's rules for your account type. If a buy says the cash isn't available yet, wait until it is.</p>
+  <p><b>Fewest orders:</b> each stock or ETF that's off target takes one order. Mutual funds that can be exchanged are paired up, so one exchange replaces a separate sell and buy wherever possible.</p>
+  <p><b>Taxes:</b> in a taxable account, every sale and exchange can realize a capital gain or loss. Buying the same or a substantially identical security within 30 days of selling it at a loss can trigger the wash sale rule.</p></div>
+  <div class="infobox" id="i-orders"><p><b>Placing them:</b> enter the orders on Fidelity's mutual fund trade ticket. Tap any box to copy its value, then paste it into the matching field. Boxes show a check mark once copied so you can track where you are.</p>
+  <ul><li><b>Exchange:</b> on the ticket, choose the option to sell a mutual fund and use the proceeds to buy another. Paste the <b>Sell</b> fund, the <b>Buy</b> fund, and the share or dollar amount.</li>
+  <li><b>Buy:</b> a plain purchase from the core cash position, in dollars.</li>
+  <li><b>Sell:</b> sells into the core cash position. This only appears when you're keeping more cash than you have now.</li>
+  <li><b>All shares:</b> the last order out of a fund you're dropping. If the ticket offers a sell-all-shares choice, use it; otherwise enter the share count shown, which is your whole position.</li>
+  <li><b>≈ amount:</b> the order's estimated value at the last close.</li></ul>
+  <p><b>Timing:</b> orders placed before 4 p.m. Eastern (2 p.m. Mountain) fill at that day's closing price; later ones fill the next business day. Both sides of an exchange are priced the same day.</p>
+  <p><b>Fewest orders:</b> the tool groups funds whose dollar changes cancel out exactly and trades only within each group. A group of n funds needs n − 1 orders, so the plan uses the fewest orders possible. With more than 20 funds changing, it uses a faster method that comes close.</p>
+  <p><b>Before placing:</b> check minimum first purchases, short-term redemption fees, and frequent-trading rules for each fund. In a taxable account, every exchange is a sale for tax purposes.</p></div>
+  <div class="summary">
+   <div><span>Portfolio value</span><b id="sTotal">—</b></div>
+   <div><span>Orders</span><b id="sCount">—</b></div>
+   <div><span>Money moved</span><b id="sMoved">—</b></div>
+  </div>
+  <div style="margin:-8px 0 12px"><span class="lbl" style="font-size:14px;color:var(--mute)">What these numbers mean <button type="button" class="info" data-info="i-summary" aria-expanded="false" aria-label="About the summary">i</button></span></div>
+  <div class="infobox" id="i-summary"><ul><li><b>Portfolio value:</b> all holdings plus cash, including new money and pending activity if counted.</li>
+  <li><b>Orders:</b> how many orders to place.</li>
+  <li><b>Money moved:</b> the combined value of all orders at the last close.</li></ul></div>
+  <ul class="msgs" id="msgs"></ul>
+  <p class="taphint hidden" id="tapHint"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>Tap any box to copy it, then paste into Fidelity's trade ticket.</p>
+  <h3 class="phase etf-only hidden" id="ph1"><span>1</span>Sell ETFs &amp; stocks</h3>
+  <ol class="orders" id="orders"></ol>
+  <h3 class="phase etf-only hidden" id="ph2"><span>2</span>Mutual fund orders</h3>
+  <p class="phnote etf-only hidden" id="ph2note">Place before 4 p.m. Eastern (2 p.m. Mountain). These fill at today's closing price.</p>
+  <ol class="orders" id="orders2"></ol>
+  <div class="afterblock etf-only hidden" id="afterBlock">
+   <label><span class="lbl">Cash available before final buys (optional)<button type="button" class="info" data-info="i-after" aria-expanded="false" aria-label="About cash after sells">i</button></span><span class="adorn" data-u="$"><input id="afterSells" data-clr class="n" inputmode="decimal" aria-label="Cash available before final buys"></span></label>
+   <p class="note hidden" id="afterNote">Final buys resized to match this cash.</p>
+  </div>
+  <div class="infobox" id="i-after"><p>Optional. Prices move between planning and the moment your sells fill, so the cash you actually have before the final buys will be a little different from the plan.</p>
+  <p>Once the earlier steps are done, look up the account's <b>cash available to trade</b> in Fidelity and enter it here. The stock and ETF buy amounts are then resized to use exactly that cash, minus any cash you're keeping, while keeping the same proportions.</p>
+  <p>Leave it blank to use the planned amounts.</p></div>
+  <h3 class="phase etf-only hidden" id="ph3"><span>3</span>Buy ETFs &amp; stocks</h3>
+  <p class="phnote warnnote etf-only hidden" id="ph3note">These buys use cash from today's mutual fund sales, which only arrives after the close. Place them the next business day.</p>
+  <p class="phnote etf-only hidden" id="ph3left"></p>
+  <ol class="orders" id="orders3"></ol>
+  <div class="row" id="orderBtns"><button id="copyOrders">Copy all orders</button><button id="clearCopied" disabled>Clear copied</button><button id="dlOrders">Download CSV</button><button type="button" class="info" data-info="i-export" aria-expanded="false" aria-label="About copying and downloading orders">i</button><span id="copyMsg" class="status"></span></div>
+  <div class="infobox" id="i-export"><ul><li><b>Copy all orders</b> copies the full plan as a numbered text list, handy for pasting into notes or a message.</li>
+  <li><b>Clear copied</b> resets the check marks on the order boxes, so you can start entering the orders again from the top.</li>
+  <li><b>Download CSV</b> saves the orders as a spreadsheet: type, sell fund, buy fund, shares, whether it's a sell-all order, dollars, and estimated value.</li></ul></div>
+ </section>
+ <section>
+  <h2>Before and after <button type="button" class="info" data-info="i-alloc" aria-expanded="false" aria-label="About before and after">i</button></h2>
+  <div class="infobox" id="i-alloc-etf"><ul><li><b>Now / Now %:</b> each position's current value and share of the total portfolio.</li>
+  <li><b>Target %:</b> the goal as a share of the total portfolio, including any cash you keep.</li>
+  <li><b>Change:</b> dollars going into (+) or out of (−) each position. "within tolerance" means it was skipped.</li>
+  <li><b>After %:</b> the expected result at the prices entered. Prices will move before and during trading, so the real result will differ slightly.</li></ul>
+  <p>On narrow screens, the dollar columns are hidden to save space.</p></div>
+  <div class="infobox" id="i-alloc"><ul><li><b>Now / Now %:</b> each fund's current value and share of the total portfolio.</li>
+  <li><b>Target %:</b> the goal as a share of the total portfolio, including any cash you keep.</li>
+  <li><b>Change:</b> dollars going into (+) or out of (−) each fund. "within tolerance" means it was skipped.</li>
+  <li><b>After %:</b> the expected result at the last close. Today's price changes will shift it slightly.</li></ul>
+  <p>On a phone, the dollar columns are hidden to save space.</p></div>
+  <div class="allocwrap">
+   <table class="alloc">
+    <thead><tr><th>Fund</th><th class="num wide">Now</th><th class="num">Now %</th><th class="num">Target %</th><th class="num wide">Change</th><th class="num">After %</th></tr></thead>
+    <tbody id="allocBody"></tbody>
+   </table>
+  </div>
+ </section>
+</div>
+</main>
+<a href="#ordersTop" class="mbar" id="mbar"><span id="mbarText">No orders yet</span><b>View orders ↓</b></a>
+<div class="modal" id="modal" aria-hidden="true"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="shead"><h3 id="modalTitle"></h3><button type="button" class="close" id="modalClose" aria-label="Close">×</button></div><div class="sbody" id="modalBody"></div><div class="ack hidden" id="ackRow"><button type="button" id="ackBtn">I understand</button></div></div></div>
+<footer>
+ <p>Independent tool, not affiliated with or endorsed by Fidelity Investments or FMR LLC. Fidelity is a registered trademark of FMR LLC; other names belong to their owners. For informational purposes only, not investment, tax, or legal advice, or a recommendation to buy or sell any security. Results are estimates; review every order before placing it. Investing involves risk, including loss of principal. Provided as is, without warranty. <button type="button" class="linkbtn" id="openTerms">Full disclosures</button></p>
+</footer>
+<div class="infobox" id="i-terms"><p><b>Independent tool.</b> Portfolio Rebalancer is not affiliated with, endorsed by, sponsored by, or connected to Fidelity Investments, FMR LLC, or any other financial company. Fidelity is a registered trademark of FMR LLC. All other trademarks, fund names, and ticker symbols belong to their respective owners and are used only to identify securities and file formats.</p>
+<p><b>Not advice.</b> This tool is for informational and educational purposes only. Nothing it shows is investment, financial, tax, legal, or accounting advice, or a recommendation, offer, or solicitation to buy or sell any security. It only performs calculations on the holdings, prices, and target percentages you enter. It does not choose investments, set targets, or assess whether any strategy is suitable for you.</p>
+<p><b>No professional relationship.</b> Using this tool does not create an advisory, brokerage, fiduciary, or other professional relationship. The tool's author is not acting as your financial adviser, broker, or representative, and the tool is not offered by or on behalf of any broker-dealer or investment adviser. It is provided free of charge, and the author receives no compensation from any company or security mentioned.</p>
+<p><b>Estimates only.</b> Results are estimates based on the data you provide, which may be delayed, incomplete, or wrong. Actual prices, fills, share rounding, fees, order rules, settlement, and availability of dollar-based trading may differ. Descriptions of how orders, exchanges, and settlement work are general and may not match your broker's current rules or your account type. Confirm details with your broker.</p>
+<p><b>Your decisions.</b> Review every order before placing it. You are solely responsible for your investment decisions and their results, including taxes. Investing involves risk, including the possible loss of principal. Consider consulting a qualified professional before making investment or tax decisions.</p>
+<p><b>No warranty.</b> The tool is provided "as is" and "as available," without warranties of any kind, express or implied, including accuracy, fitness for a particular purpose, and non-infringement. To the fullest extent permitted by law, the author is not liable for any loss or damage arising from its use or from reliance on its results.</p>
+<p><b>Privacy.</b> Your positions, targets, and settings stay in your browser. Nothing you enter or upload is sent to or stored by the author. Saved presets and settings live only in this browser's local storage. The page loads its fonts from Google Fonts.</p></div>
+
+<script>
+{
+/* ---------- core planning logic (pure) ---------- */
+const C = x => Math.round(x * 100);
+const isMFSym = sym => /^[A-Z]{4}X$/.test(sym);
+
+function maxZeroGroups(vals){
+  const n = vals.length;
+  if (n === 0) return [];
+  if (n > 20) return [vals.map((_, i) => i)];
+  const N = 1 << n, sum = new Float64Array(N), dp = new Int8Array(N);
+  for (let m = 1; m < N; m++){ const b = m & -m; sum[m] = sum[m ^ b] + vals[31 - Math.clz32(b)]; }
+  for (let m = 1; m < N; m++){
+    let best = -1;
+    for (let k = m; k; k &= k - 1){ const v = dp[m ^ (k & -k)]; if (v > best) best = v; }
+    dp[m] = best + (sum[m] === 0 ? 1 : 0);
+  }
+  const order = []; let m = N - 1;
+  while (m){
+    const z = sum[m] === 0 ? 1 : 0;
+    for (let k = m; k; k &= k - 1){ const b = k & -k; if (dp[m ^ b] === dp[m] - z){ order.push(31 - Math.clz32(b)); m ^= b; break; } }
+  }
+  order.reverse();
+  const groups = []; let cur = [], acc = 0;
+  for (const i of order){ cur.push(i); acc += vals[i]; if (acc === 0){ groups.push(cur); cur = []; } }
+  if (cur.length) groups.push(cur);
+  return groups;
+}
+
+function settle(nodes, idx){
+  const src = idx.filter(i => nodes[i].delta < 0).map(i => ({i, a: -nodes[i].delta})).sort((a, b) => b.a - a.a);
+  const snk = idx.filter(i => nodes[i].delta > 0).map(i => ({i, a: nodes[i].delta})).sort((a, b) => b.a - a.a);
+  const out = []; let s = 0, k = 0;
+  while (s < src.length && k < snk.length){
+    const amt = Math.min(src[s].a, snk[k].a);
+    if (amt > 0) out.push({from: src[s].i, to: snk[k].i, c: amt});
+    src[s].a -= amt; snk[k].a -= amt;
+    if (src[s].a === 0) s++;
+    if (snk[k].a === 0) k++;
+  }
+  return out;
+}
+
+// input: {holdings:[{sym,shares,price,value}], targets:[{sym,pct}], cash, units, tol}
+function plan(inp){
+  const errors = [], notes = [];
+  const H = new Map();
+  for (const h of inp.holdings){
+    const sym = (h.sym || '').trim().toUpperCase(); if (!sym) continue;
+    let val = null;
+    if (h.shares != null && h.price) val = h.shares * h.price;
+    else if (h.value != null) val = h.value;
+    if (val == null){ errors.push(`${sym}: needs a price or a dollar value.`); continue; }
+    const e = H.get(sym) || {sym, cur: 0, shares: 0, sharesKnown: true, price: h.price || null};
+    e.cur += C(val);
+    if (h.shares != null && h.price) e.shares += h.shares; else e.sharesKnown = false;
+    if (h.price) e.price = h.price;
+    H.set(sym, e);
+  }
+  const T = new Map(); let pctSum = 0;
+  for (const t of inp.targets){
+    const sym = (t.sym || '').trim().toUpperCase(); if (!sym || !t.pct) continue;
+    T.set(sym, (T.get(sym) || 0) + t.pct); pctSum += t.pct;
+  }
+  if (!T.size) errors.push('Add at least one target fund.');
+  else if (Math.abs(pctSum - 100) > 0.001) errors.push(`Fund percentages add up to ${+pctSum.toFixed(3)}%, not 100%.`);
+  if (inp.mode !== 'etf'){
+    const bad = [...new Set([...H.keys(), ...T.keys()].filter(sym => !isMFSym(sym)))];
+    if (bad.length) errors.push(`${bad.join(', ')} ${bad.length > 1 ? "aren't mutual fund symbols" : "isn't a mutual fund symbol"}. Mutual fund tickers are five letters ending in X, like FXAIX. For stocks or ETFs, use the Mixed portfolio tab.`);
+  }
+  const cashC = C(inp.cash || 0);
+  let total = cashC; for (const e of H.values()) total += e.cur;
+  if (total <= 0) errors.push('Portfolio value must be above zero.');
+  const rv = inp.reserve || {mode: 'usd', value: 0};
+  const reserveC = Math.max(0, rv.mode === 'pct' ? Math.round(total * (rv.value || 0) / 100) : C(rv.value || 0));
+  if (total > 0 && reserveC > total) errors.push('Cash to keep is more than the whole portfolio.');
+  if (errors.length) return {errors, notes, orders: [], rows: [], total};
+  const investable = total - reserveC;
+
+  // target dollars in cents, rounding remainder to the largest weight
+  const tgt = new Map(); let assigned = 0, big = null;
+  for (const [sym, p] of T){ const v = Math.floor(investable * p / 100); tgt.set(sym, v); assigned += v; if (!big || p > T.get(big)) big = sym; }
+  tgt.set(big, tgt.get(big) + (investable - assigned));
+
+  const nodes = [];
+  const syms = new Set([...H.keys(), ...T.keys()]);
+  for (const sym of syms){
+    const h = H.get(sym), cur = h ? h.cur : 0, t = tgt.get(sym) || 0;
+    nodes.push({sym, kind: 'fund', cur, tgt: t, delta: t - cur, shares: h ? h.shares : 0, sharesKnown: h ? h.sharesKnown : false, price: h ? h.price : null});
+  }
+  if (cashC || reserveC) nodes.push({sym: 'CASH', kind: 'cash', cur: cashC, tgt: reserveC, delta: reserveC - cashC});
+
+  // tolerance: leave near-target funds alone, push residual to the biggest mover
+  const tolC = inp.tolMode === 'pct' ? Math.round(total * (inp.tol || 0) / 100) : C(inp.tol || 0);
+  const etf = inp.mode === 'etf', buyOnly = etf && inp.method === 'buyonly';
+  if (tolC > 0 && !buyOnly){
+    let resid = 0;
+    for (const n of nodes) if (n.kind === 'fund' && n.cur > 0 && n.tgt > 0 && n.delta && Math.abs(n.delta) < tolC){ resid += n.delta; n.delta = 0; n.skipped = true; }
+    if (resid){
+      const cand = nodes.filter(n => n.kind === 'fund' && n.tgt > 0).sort((a, b) => (b.delta > 0) - (a.delta > 0) || Math.abs(b.delta) - Math.abs(a.delta) || b.tgt - a.tgt)[0];
+      cand.delta += resid; if (cand.skipped && cand.delta) cand.skipped = false;
+    }
+  }
+
+  if (etf){
+    const funds = nodes.filter(n => n.kind === 'fund'), cashN = nodes.find(n => n.kind === 'cash');
+    for (const n of funds) n.mf = isMFSym(n.sym);
+    if (buyOnly){
+      for (const n of funds) n.delta = 0;
+      const avail = cashC - reserveC, tf = funds.filter(n => n.tgt > 0);
+      if (avail <= 0){ errors.push('There is no cash above the amount to keep. Buy only never sells, so add cash or new money to invest.'); return {errors, notes, warns: [], orders: [], sells: [], buys: [], rows: [], total}; }
+      const f = k => tf.reduce((a, n) => a + Math.max(0, k * n.tgt - n.cur), 0);
+      let lo = 0, hi = (avail + tf.reduce((a, n) => a + n.cur, 0)) / tf.reduce((a, n) => a + n.tgt, 0) + 1;
+      for (let i = 0; i < 100; i++){ const mid = (lo + hi) / 2; if (f(mid) < avail) lo = mid; else hi = mid; }
+      for (const n of tf) n.delta = Math.floor(Math.max(0, hi * n.tgt - n.cur));
+      const fix = () => { const sum = tf.reduce((a, n) => a + n.delta, 0); const big = tf.reduce((a, n) => n.delta > a.delta ? n : a, tf[0]); big.delta += avail - sum; };
+      fix();
+      if (tolC > 0){
+        const keep = tf.map(n => n.delta);
+        for (const n of tf) if (n.delta > 0 && n.delta < tolC){ n.delta = 0; n.skipped = true; }
+        if (tf.some(n => n.delta > 0)) fix(); else tf.forEach((n, i) => { n.delta = keep[i]; n.skipped = false; });
+      }
+      if (cashN) cashN.delta = -avail;
+    }
+    const sells = [], buys = [], mfo = [], warns = [];
+    const whole = !!inp.whole, cush = Math.max(0, inp.cushion || 0) / 100, wants = [];
+    for (const n of funds){
+      if (n.mf) continue;
+      if (whole && n.delta !== 0){
+        if (n.delta < 0){
+          if (n.tgt === 0){ sells.push({type: 'Sell', from: n.sym, to: 'CASH', c: -n.delta, unit: 'all', shares: n.sharesKnown ? Math.round(n.shares * 1000) / 1000 : null}); continue; }
+          if (!n.price || !n.sharesKnown){ errors.push(`${n.sym}: whole-share mode needs a share count and price for this holding.`); continue; }
+          let sh = Math.min(Math.round(-n.delta / 100 / n.price), Math.floor(n.shares));
+          if (sh <= 0){ warns.push(`${n.sym}: the sale would be less than one share, so it's skipped.`); n.wdelta = 0; continue; }
+          const c = Math.round(sh * n.price * 100);
+          sells.push({type: 'Sell', from: n.sym, to: 'CASH', c, unit: 'shares', whole: true, shares: sh}); n.wdelta = -c;
+        } else {
+          if (!n.price){ errors.push(`${n.sym}: whole-share mode needs a price to buy it.`); continue; }
+          wants.push(n);
+        }
+        continue;
+      }
+      if (n.delta < 0){
+        const o = {type: 'Sell', from: n.sym, to: 'CASH', c: -n.delta};
+        if (n.tgt === 0){ o.unit = 'all'; o.shares = n.sharesKnown ? Math.round(n.shares * 1000) / 1000 : null; }
+        else if (n.price && n.sharesKnown && (inp.sellUnits === 'shares' || o.c >= 0.8 * n.cur)){
+          o.unit = 'shares'; o.shares = Math.min(Math.floor(o.c / 100 / n.price * 1000) / 1000, n.shares);
+          if (inp.sellUnits !== 'shares') o.note = `Sold in shares: this is ${Math.round(o.c / n.cur * 100)}% of the position, so a dollar amount could exceed what it's worth if the price drops before the order fills.`;
+        }
+        else {
+          o.unit = 'dollars';
+          if (o.c >= 0.8 * n.cur) o.note = `This is ${Math.round(o.c / n.cur * 100)}% of the position. Enter shares for this holding so it can be sold in shares instead; a dollar amount could exceed the position's value if the price drops.`;
+        }
+        sells.push(o);
+      } else if (n.delta > 0) buys.push({type: 'Buy', from: 'CASH', to: n.sym, c: n.delta, unit: 'dollars'});
+    }
+    // mutual funds: exchange among themselves where allowed, otherwise sell to / buy from cash
+    const mfn = funds.filter(n => n.mf && n.delta !== 0);
+    if (mfn.length){
+      let pool, transfers = [];
+      if (inp.exch !== false){
+        pool = mfn.slice();
+        const net = -mfn.reduce((a2, n) => a2 + n.delta, 0);
+        if (net) pool.push({sym: 'CASH', kind: 'cash', delta: net});
+        for (const g of maxZeroGroups(pool.map(n => n.delta))) transfers = transfers.concat(settle(pool, g));
+      } else {
+        pool = mfn.concat([{sym: 'CASH', kind: 'cash', delta: 0}]);
+        const ci = pool.length - 1;
+        mfn.forEach((n, i) => transfers.push(n.delta < 0 ? {from: i, to: ci, c: -n.delta} : {from: ci, to: i, c: n.delta}));
+      }
+      const bySrc = new Map();
+      for (const t of transfers){ if (!bySrc.has(t.from)) bySrc.set(t.from, []); bySrc.get(t.from).push(t); }
+      for (const [fi, list] of bySrc){
+        const f = pool[fi]; list.sort((x, y) => y.c - x.c);
+        const closing = f.kind === 'fund' && f.tgt === 0; let left = f.shares;
+        list.forEach((t, k) => {
+          const to = pool[t.to];
+          const o = {from: f.sym, to: to.sym, c: t.c, type: f.kind === 'cash' ? 'Buy' : to.kind === 'cash' ? 'Sell' : 'Exchange'};
+          if (f.kind === 'cash') o.unit = 'dollars';
+          else if (closing && k === list.length - 1){ o.unit = 'all'; o.shares = f.sharesKnown ? Math.max(0, Math.round(left * 1000) / 1000) : null; }
+          else if (f.price && f.sharesKnown && inp.mfUnits !== 'dollars'){ o.unit = 'shares'; o.shares = Math.round(t.c / 100 / f.price * 1000) / 1000; left -= o.shares; }
+          else { o.unit = 'dollars'; if (f.price) left -= t.c / 100 / f.price; }
+          mfo.push(o);
+        });
+      }
+      const rank = {Exchange: 0, Sell: 1, Buy: 2};
+      mfo.sort((x, y) => (x.unit === 'all') - (y.unit === 'all') || rank[x.type] - rank[y.type]);
+    }
+    sells.sort((x, y) => y.c - x.c); buys.sort((x, y) => y.c - x.c);
+    const sumC = arr => arr.reduce((a2, o) => a2 + o.c, 0);
+    const mfSellC = sumC(mfo.filter(o => o.type === 'Sell')), mfBuyC = sumC(mfo.filter(o => o.type === 'Buy'));
+    let nextDay = !!buys.length && mfSellC > 0 && sumC(buys) > cashC + sumC(sells) - mfBuyC - reserveC;
+    let scaled = false, leftover = null, cushHeld = 0;
+    if (whole && wants.length){
+      // cash for buys: conservative (sale proceeds assumed to come in lower by the cushion)
+      const useActual = inp.afterSells != null && (sells.length || mfo.length);
+      const nominal = useActual ? C(inp.afterSells) - reserveC : cashC + sumC(sells) + mfSellC - mfBuyC - reserveC;
+      const avail = useActual ? nominal : Math.floor(cashC + sumC(sells) * (1 - cush) + mfSellC * (1 - cush) - mfBuyC - reserveC);
+      scaled = useActual;
+      const W = wants.map(n => ({n, d: n.delta, P: Math.round(n.price * 100), L: Math.ceil(n.price * 100 * (1 + cush)), k: 0}));
+      for (const w of W) w.k = Math.floor(w.d / w.L);
+      let spend = W.reduce((a2, w) => a2 + w.k * w.L, 0);
+      while (spend > Math.max(0, avail)){
+        const w = W.filter(x => x.k > 0).sort((x, y) => (y.k * y.P - y.d) - (x.k * x.P - x.d))[0]; if (!w) break;
+        w.k--; spend -= w.L;
+      }
+      for (;;){
+        const room = avail - spend;
+        const w = W.filter(x => x.L <= room && (x.d - x.k * x.P) >= x.P / 2).sort((x, y) => (y.d - y.k * y.P) - (x.d - x.k * x.P))[0];
+        if (!w) break; w.k++; spend += w.L;
+      }
+      for (const w of W){
+        if (w.k > 0){ const c = w.k * w.P; buys.push({type: 'Buy', from: 'CASH', to: w.n.sym, c, unit: 'wshares', whole: true, shares: w.k, limit: w.L / 100}); w.n.wdelta = c; }
+        else { w.n.wdelta = 0; warns.push(w.d < w.P ? `${w.n.sym}: its target needs less than one share (${usd(w.P)}), so it isn't bought.` : `${w.n.sym}: there isn't enough cash to buy a whole share, so it isn't bought.`); }
+      }
+      buys.sort((x, y) => y.c - x.c);
+      leftover = Math.max(0, nominal - W.reduce((a2, w) => a2 + w.k * w.P, 0));
+      cushHeld = W.reduce((a2, w) => a2 + w.k * (w.L - w.P), 0);
+      if (avail <= 0 && W.length) errors.push('There is no cash left for the stock and ETF buys after the cash you are keeping.');
+      nextDay = !!buys.length && mfSellC > 0 && spend > cashC + Math.floor(sumC(sells) * (1 - cush)) - mfBuyC - reserveC;
+      if (leftover > 0.02 * total) warns.push(`About ${usd(leftover)} (${(leftover / total * 100).toFixed(1)}% of the portfolio) will stay in cash, because whole shares don't divide evenly${cush ? ' and the price cushion holds some back' : ''}.`);
+    }
+    if (!whole && inp.afterSells != null && buys.length && (sells.length || mfo.length)){
+      const availC = C(inp.afterSells) - reserveC, planned = sumC(buys);
+      if (availC <= 0) errors.push('The cash entered is not more than the cash to keep, so there is nothing left for the final buys.');
+      else { let used = 0; for (const o of buys){ o.c = Math.floor(o.c * availC / planned); used += o.c; } buys[0].c += availC - used; scaled = true; }
+    }
+    if (errors.length) return {errors, notes, warns, orders: [], sells: [], mfo: [], buys: [], rows: [], total};
+    const buyBy = new Map(buys.map(o => [o.to, o.c]));
+    let rows = nodes.map(n => {
+      const d = n.kind === 'cash' ? (scaled ? reserveC - n.cur : n.delta) : (whole && !n.mf && n.wdelta != null) ? n.wdelta : (!n.mf && n.delta > 0) ? (buyBy.get(n.sym) || 0) : n.delta;
+      return {sym: n.sym, kind: n.kind, cur: n.cur, tgt: n.tgt, delta: d, after: n.cur + d, skipped: !!n.skipped};
+    });
+    if (whole && !scaled){
+      const fundAfter = rows.filter(x => x.kind !== 'cash').reduce((a2, x) => a2 + x.after, 0);
+      let cashRow = rows.find(x => x.kind === 'cash');
+      if (!cashRow && total - fundAfter){ cashRow = {sym: 'CASH', kind: 'cash', cur: 0, tgt: reserveC, delta: 0, after: 0, skipped: false}; rows.push(cashRow); }
+      if (cashRow){ cashRow.after = total - fundAfter; cashRow.delta = cashRow.after - cashRow.cur; }
+    }
+    rows.sort((x, y) => (x.kind === 'cash') - (y.kind === 'cash') || y.after - x.after || y.cur - x.cur);
+    return {errors, notes, warns, orders: sells.concat(mfo, buys), sells, mfo, buys, rows, total, scaled, nextDay, leftover, cushHeld, whole};
+  }
+
+  const nz = nodes.map((n, i) => i).filter(i => nodes[i].delta !== 0);
+  const groups = maxZeroGroups(nz.map(i => nodes[i].delta));
+  let transfers = [];
+  for (const g of groups) transfers = transfers.concat(settle(nodes, g.map(j => nz[j])));
+
+  // build orders
+  const bySrc = new Map();
+  for (const t of transfers){ if (!bySrc.has(t.from)) bySrc.set(t.from, []); bySrc.get(t.from).push(t); }
+  const orders = [];
+  for (const [fi, list] of bySrc){
+    const f = nodes[fi];
+    list.sort((a, b) => b.c - a.c);
+    const closing = f.kind === 'fund' && f.tgt === 0;
+    let sharesLeft = f.shares;
+    list.forEach((t, k) => {
+      const to = nodes[t.to];
+      const o = {from: f.sym, to: to.sym, c: t.c,
+        type: f.kind === 'cash' ? 'Buy' : to.kind === 'cash' ? 'Sell' : 'Exchange'};
+      if (f.kind === 'cash'){ o.unit = 'dollars'; }
+      else if (closing && k === list.length - 1){
+        o.unit = 'all'; o.shares = f.sharesKnown ? Math.max(0, Math.round(sharesLeft * 1000) / 1000) : null;
+      } else if (inp.units === 'shares' && f.price && f.sharesKnown){
+        o.unit = 'shares'; o.shares = Math.round(t.c / 100 / f.price * 1000) / 1000; sharesLeft -= o.shares;
+      } else {
+        o.unit = 'dollars'; if (f.price) sharesLeft -= t.c / 100 / f.price;
+        if (inp.units === 'shares') notes.push(`${f.sym}: no share count or price, so its order is in dollars.`);
+      }
+      orders.push(o);
+    });
+  }
+  const rank = {Exchange: 0, Buy: 1, Sell: 2};
+  orders.sort((a, b) => (a.unit === 'all') - (b.unit === 'all') || rank[a.type] - rank[b.type]);
+
+  for (const n of nodes){
+    if (n.kind !== 'fund') continue;
+    if (n.tgt === 0 && n.cur > 0) notes.push(`${n.sym} is not in the target and will be sold completely.`);
+    if (n.cur === 0 && n.tgt > 0) notes.push(`${n.sym} is a new position. Check its minimum initial investment.`);
+  }
+  const rows = nodes.map(n => ({sym: n.sym, kind: n.kind, cur: n.cur, tgt: n.tgt, delta: n.delta, after: n.cur + n.delta, skipped: !!n.skipped}))
+    .sort((a, b) => (a.kind === 'cash') - (b.kind === 'cash') || b.after - a.after || b.cur - a.cur);
+  return {errors, notes: [...new Set(notes)], orders, rows, total, groups: groups.length};
+}
+window.__plan = plan;
+
+/* ---------- UI ---------- */
+const $ = id => document.getElementById(id);
+const num = v => { if (v == null) return null; const s = String(v).replace(/[$,\s+]/g, '').replace(/^\((.*)\)$/, '-$1'); if (s === '' || s === '--' || s === '-') return null; const x = parseFloat(s); return isNaN(x) ? null : x; };
+const usd = c => (c / 100).toLocaleString('en-US', {style: 'currency', currency: 'USD'});
+const pct = x => (x * 100).toFixed(2) + '%';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]));
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+};
+
+let M = store.get('rebal.tab', 'mf') === 'etf' ? 'etf' : 'mf';
+const K = k => (M === 'etf' ? 'rebal.etf.' : 'rebal.') + k;
+const S = {holdings: [], targets: store.get(K('lastTargets'), []), prices: {}, csvAccounts: null, lastPlan: null};
+if (!S.targets.length) S.targets = [{sym: '', pct: null}];
+if (!S.holdings.length) S.holdings = [{sym: '', shares: null, value: null}];
+const priceOf = sym => { const p = S.prices[(sym || '').trim().toUpperCase()]; return p ? p.price : null; };
+
+function addClears(){
+  document.querySelectorAll('input[data-clr]:not([data-clr-done])').forEach(inp => {
+    inp.dataset.clrDone = '1';
+    if (!inp.placeholder) inp.placeholder = ' ';
+    const w = document.createElement('span'); w.className = 'cwrap' + (inp.dataset.clr === 'focus' ? ' f' : '');
+    inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'clear'; b.tabIndex = -1; b.setAttribute('aria-label', 'Clear'); b.textContent = '×';
+    w.appendChild(b);
+    const ad = w.closest('.adorn'); if (ad) ad.classList.add('hasclr');
+  });
+}
+document.addEventListener('pointerdown', e => { if (e.target.closest('.clear')) e.preventDefault(); });
+document.addEventListener('click', e => {
+  const b = e.target.closest('.clear'); if (!b) return;
+  const inp = b.parentNode.querySelector('input');
+  inp.value = ''; inp.dispatchEvent(new Event('input', {bubbles: true})); inp.focus();
+});
+function renderHold(){
+  $('holdBody').innerHTML = S.holdings.map((h, i) => {
+    const p = priceOf(h.sym), computed = h.shares != null && p;
+    const val = computed ? (h.shares * p).toFixed(2) : (h.value ?? '');
+    return `<tr><td data-l="Symbol"><input class="sym" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" data-t="h" data-i="${i}" data-f="sym" data-clr value="${esc(h.sym)}" aria-label="Symbol"></td>
+      <td data-l="Shares"><input class="n" inputmode="decimal" data-t="h" data-i="${i}" data-f="shares" data-clr="focus" value="${h.shares ?? ''}" aria-label="Shares"></td>
+      <td data-l="Price"><span class="adorn" data-u="$"><input class="n" inputmode="decimal" data-t="h" data-i="${i}" data-f="price" data-clr="focus" value="${p ?? ''}" aria-label="Price"></span></td>
+      <td data-l="Value"><span class="adorn" data-u="$"><input class="n" inputmode="decimal" data-t="h" data-i="${i}" data-f="value" data-clr="focus" value="${val}" ${computed ? 'disabled' : ''} aria-label="Value"></span></td>
+      <td class="del"><button class="x" data-del="h" data-i="${i}" aria-label="Remove row"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button></td></tr>`;
+  }).join('');
+  addClears();
+}
+function renderTgt(){
+  $('tgtBody').innerHTML = S.targets.map((t, i) => `<tr>
+    <td><input class="sym" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" data-t="t" data-i="${i}" data-f="sym" data-clr value="${esc(t.sym)}" aria-label="Symbol"></td>
+    <td><span class="adorn suf" data-u="%"><input class="n" inputmode="decimal" data-t="t" data-i="${i}" data-f="pct" data-clr value="${t.pct ?? ''}" aria-label="Target percent"></span></td>
+    <td><button class="x" data-del="t" data-i="${i}" aria-label="Remove row"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button></td></tr>`).join('');
+  addClears();
+}
+function renderPresets(){
+  const p = store.get(K('presets'), {});
+  const names = Object.keys(p).sort();
+  $('presetSel').innerHTML = names.length ? names.map(n => `<option>${esc(n)}</option>`).join('') : '<option value="">None saved</option>';
+  $('presetCount').textContent = names.length ? `${names.length} saved` : 'None saved yet';
+  $('loadPreset').disabled = $('delPreset').disabled = !names.length;
+  if ($('delConfirm')) $('delConfirm').classList.add('hidden');
+}
+
+function onField(e){
+  const el = e.target; if (!el.dataset.t) return;
+  const arr = el.dataset.t === 'h' ? S.holdings : S.targets, row = arr[+el.dataset.i], f = el.dataset.f;
+  if (f === 'sym'){
+    const up = el.value.toUpperCase();
+    if (up !== el.value){ const a = el.selectionStart, b = el.selectionEnd; el.value = up; try { el.setSelectionRange(a, b); } catch(_){} }
+    row.sym = up.trim();
+  }
+  else if (f === 'price'){ const sym = (row.sym || '').toUpperCase(); if (sym){ const v = num(el.value); if (v) S.prices[sym] = {price: v, src: 'manual'}; else delete S.prices[sym]; } }
+  else row[f] = num(el.value);
+  if (el.dataset.t === 't') store.set(K('lastTargets'), S.targets);
+  recompute();
+}
+document.addEventListener('input', onField);
+function syncHoldRow(i){
+  const h = S.holdings[i], tr = $('holdBody').rows[i]; if (!h || !tr) return;
+  const p = priceOf(h.sym), computed = h.shares != null && p;
+  const pe = tr.querySelector('[data-f=price]'), ve = tr.querySelector('[data-f=value]');
+  if (document.activeElement !== pe) pe.value = p ?? '';
+  if (computed){ ve.value = (h.shares * p).toFixed(2); ve.disabled = true; }
+  else if (ve.disabled){ ve.disabled = false; ve.value = h.value ?? ''; }
+  fit(ve); fit(pe);
+}
+document.addEventListener('input', e => { if (e.target.dataset.t === 'h') syncHoldRow(+e.target.dataset.i); });
+document.addEventListener('click', e => {
+  const d = e.target.closest('[data-del]'); if (!d) return;
+  const arr = d.dataset.del === 'h' ? S.holdings : S.targets; arr.splice(+d.dataset.i, 1);
+  if (d.dataset.del === 't') store.set(K('lastTargets'), S.targets);
+  renderHold(); renderTgt(); recompute();
+});
+$('addHold').onclick = () => { S.holdings.push({sym: '', shares: null, value: null}); renderHold(); };
+$('addTgt').onclick = () => { S.targets.push({sym: '', pct: null}); renderTgt(); };
+['cash', 'addCash', 'pending', 'tol'].forEach(id => $(id).addEventListener('input', recompute));
+const syncAdorn = (id, mode) => { const a = $(id + 'Adorn'); a.dataset.u = mode === 'pct' ? '%' : '$'; a.classList.toggle('suf', mode === 'pct'); };
+const getReserve = () => ({mode: $('reserveMode').value, value: num($('reserve').value) || 0});
+const setReserve = r => { r = r || {mode: 'usd', value: 0}; $('reserveMode').value = r.mode === 'pct' ? 'pct' : 'usd'; $('reserve').value = r.value || ''; syncAdorn('reserve', $('reserveMode').value); store.set(K('reserve'), getReserve()); };
+setReserve(store.get(K('reserve'), null));
+$('reserve').addEventListener('input', () => { store.set(K('reserve'), getReserve()); recompute(); });
+$('reserveMode').onchange = () => { syncAdorn('reserve', $('reserveMode').value); store.set(K('reserve'), getReserve()); recompute(); };
+$('tolMode').value = store.get(K('tolMode'), 'usd'); syncAdorn('tol', $('tolMode').value);
+$('tolMode').onchange = () => { syncAdorn('tol', $('tolMode').value); store.set(K('tolMode'), $('tolMode').value); recompute(); };
+let modalFrom = null;
+function openInfo(b){
+  modalFrom = b;
+  $('ackRow').classList.add('hidden'); $('modalClose').classList.remove('hidden'); $('modal').dataset.firstRun = '';
+  $('modalTitle').textContent = b.dataset.info === 'i-about' ? `How the ${M === 'etf' ? 'Mixed portfolio' : 'Mutual funds only'} tool works` : (b.getAttribute('aria-label') || '').replace(/^About /, '').replace(/^the /i, '').replace(/^./, c => c.toUpperCase());
+  const alt = M === 'etf' ? $(b.dataset.info + '-etf') : null;
+  $('modalBody').innerHTML = (alt || $(b.dataset.info)).innerHTML;
+  $('modalBody').scrollTop = 0; $('modalBody').previousElementSibling.classList.remove('shadow');
+  $('modal').classList.add('open'); $('modal').setAttribute('aria-hidden', 'false');
+  b.setAttribute('aria-expanded', 'true');
+  document.body.style.overflow = 'hidden';
+  $('modalClose').focus();
+}
+function closeInfo(){
+  if (!$('modal').classList.contains('open') || $('modal').dataset.firstRun) return;
+  $('modal').classList.remove('open'); $('modal').setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  if (modalFrom){ modalFrom.setAttribute('aria-expanded', 'false'); modalFrom.focus({preventScroll: true}); modalFrom = null; }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.info'); if (!b) return;
+  e.preventDefault(); openInfo(b);
+});
+$('modal').addEventListener('click', e => { if (e.target === $('modal')) closeInfo(); });
+$('modalClose').onclick = closeInfo;
+$('modalBody').addEventListener('scroll', e => e.target.previousElementSibling.classList.toggle('shadow', e.target.scrollTop > 2));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInfo(); });
+$('incPending').onchange = recompute;
+$('units').onchange = () => { store.set('rebal.units', $('units').value); recompute(); };
+$('units').value = store.get('rebal.units', 'shares');
+$('method').value = store.get('rebal.etf.method', 'full');
+$('sellUnits').value = store.get('rebal.etf.sellUnits', 'dollars');
+$('exch').checked = store.get('rebal.etf.exch', true);
+if (store.get('rebal.etf.whole', false)){ store.set('rebal.etf.sellUnits', 'whole'); store.set('rebal.etf.whole', false); $('sellUnits').value = 'whole'; }
+$('cushion').value = store.get('rebal.etf.cushion', 1);
+const syncWhole = () => $('cushRow').classList.toggle('hidden', $('sellUnits').value !== 'whole');
+syncWhole();
+$('cushion').addEventListener('input', () => { store.set('rebal.etf.cushion', num($('cushion').value) ?? ''); recompute(); });
+$('exch').onchange = () => { store.set('rebal.etf.exch', $('exch').checked); recompute(); };
+$('mfUnits').value = store.get('rebal.etf.mfUnits', 'shares');
+$('mfUnits').onchange = () => { store.set('rebal.etf.mfUnits', $('mfUnits').value); recompute(); };
+$('method').onchange = () => { store.set('rebal.etf.method', $('method').value); recompute(); };
+$('sellUnits').onchange = () => { store.set('rebal.etf.sellUnits', $('sellUnits').value); syncWhole(); recompute(); };
+$('afterSells').addEventListener('input', recompute);
+const TAB_VALS = ['cash', 'addCash', 'pending', 'reserve', 'tol', 'presetName', 'afterSells'];
+const tabState = {};
+function stashTab(){
+  tabState[M] = {holdings: S.holdings, targets: S.targets, prices: S.prices, csvAccounts: S.csvAccounts,
+    acctOpts: $('acctSel').innerHTML, acct: $('acctSel').value, acctShown: !$('acctRow').classList.contains('hidden'),
+    status: $('priceStatus').innerHTML, statusCls: $('priceStatus').className,
+    vals: Object.fromEntries(TAB_VALS.map(id => [id, $(id).value])), inc: $('incPending').checked,
+    reserveMode: $('reserveMode').value, tolMode: $('tolMode').value};
+}
+function applyMode(){
+  document.body.dataset.mode = M;
+  $('tabName').textContent = M === 'etf' ? 'Mixed portfolio' : 'Mutual funds only';
+  document.querySelectorAll('.tabs [data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === M));
+  store.set('rebal.tab', M);
+}
+function switchTab(to){
+  if (to === M) return;
+  stashTab(); M = to; const t = tabState[M];
+  if (t){
+    Object.assign(S, {holdings: t.holdings, targets: t.targets, prices: t.prices, csvAccounts: t.csvAccounts});
+    $('acctSel').innerHTML = t.acctOpts; $('acctSel').value = t.acct; $('acctRow').classList.toggle('hidden', !t.acctShown);
+    $('priceStatus').innerHTML = t.status; $('priceStatus').className = t.statusCls;
+    TAB_VALS.forEach(id => $(id).value = t.vals[id]); $('incPending').checked = t.inc;
+    $('reserveMode').value = t.reserveMode; $('tolMode').value = t.tolMode;
+  } else {
+    S.holdings = [{sym: '', shares: null, value: null}];
+    S.targets = store.get(K('lastTargets'), []); if (!S.targets.length) S.targets = [{sym: '', pct: null}];
+    S.prices = {}; S.csvAccounts = null;
+    $('acctSel').innerHTML = ''; $('acctRow').classList.add('hidden'); $('priceStatus').textContent = '';
+    TAB_VALS.forEach(id => $(id).value = ''); $('incPending').checked = false;
+    setReserve(store.get(K('reserve'), null)); $('tolMode').value = store.get(K('tolMode'), 'usd');
+  }
+  syncAdorn('reserve', $('reserveMode').value); syncAdorn('tol', $('tolMode').value);
+  applyMode(); renderHold(); renderTgt(); renderPresets(); recompute();
+}
+document.querySelectorAll('.tabs [data-tab]').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
+function setTheme(t){
+  if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else { delete document.documentElement.dataset.theme; t = 'system'; }
+  document.querySelectorAll('[data-theme-set]').forEach(b => b.setAttribute('aria-pressed', b.dataset.themeSet === t));
+  store.set('rebal.theme', t);
+  setTimeout(() => fitAll(), 0);
+}
+setTheme(store.get('rebal.theme', 'system'));
+document.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => setTheme(b.dataset.themeSet));
+const TERMS_VER = 1;
+function openTerms(firstRun){
+  modalFrom = firstRun ? null : $('openTerms');
+  $('modalTitle').textContent = firstRun ? 'Before you start' : 'Disclosures';
+  $('modalBody').innerHTML = (firstRun ? '<p>Please read these disclosures. You can find them again anytime at the bottom of the page.</p>' : '') + $('i-terms').innerHTML;
+  $('modalBody').scrollTop = 0; $('modalBody').previousElementSibling.classList.remove('shadow');
+  $('ackRow').classList.toggle('hidden', !firstRun);
+  $('modalClose').classList.toggle('hidden', !!firstRun);
+  $('modal').dataset.firstRun = firstRun ? '1' : '';
+  $('modal').classList.add('open'); $('modal').setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  (firstRun ? $('ackBtn') : $('modalClose')).focus();
+}
+$('openTerms').onclick = () => openTerms(false);
+$('ackBtn').onclick = () => { store.set('rebal.termsAck', TERMS_VER); $('modal').dataset.firstRun = ''; $('ackRow').classList.add('hidden'); $('modalClose').classList.remove('hidden'); closeInfo(); };
+if (store.get('rebal.termsAck', 0) !== TERMS_VER) openTerms(true);
+
+$('fromCur').onclick = () => {
+  const r = plan({holdings: currentHoldings(), targets: [{sym: 'X', pct: 100}], cash: 0, units: 'dollars'});
+  const funds = r.rows.filter(x => x.kind === 'fund' && x.cur > 0 && x.sym !== 'X');
+  const tot = funds.reduce((s, x) => s + x.cur, 0); if (!tot) return;
+  S.targets = funds.map(x => ({sym: x.sym, pct: Math.round(x.cur / tot * 10000) / 100}));
+  const diff = Math.round((100 - S.targets.reduce((s, t) => s + t.pct, 0)) * 100) / 100;
+  if (S.targets.length) S.targets[0].pct = Math.round((S.targets[0].pct + diff) * 100) / 100;
+  store.set(K('lastTargets'), S.targets); renderTgt(); recompute();
+};
+
+function currentHoldings(){ return S.holdings.map(h => ({sym: h.sym, shares: h.shares, price: priceOf(h.sym), value: h.value})); }
+
+const FIT_SEL = 'input.n, input.sym, input#presetName, .chip .cv, .summary b, .summary span, #mbarText, #orderBtns > button:not(.info), .tt';
+function fit(el){
+  el.style.fontSize = '';
+  if (!el.getClientRects().length) return;
+  let fs = parseFloat(getComputedStyle(el).fontSize);
+  while (el.scrollWidth > el.clientWidth + 0.5 && fs > 10){ fs -= 0.5; el.style.fontSize = fs + 'px'; }
+}
+const fitAll = () => document.querySelectorAll(FIT_SEL).forEach(fit);
+let fitT; window.addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(fitAll, 80); });
+['focusin', 'focusout'].forEach(ev => document.addEventListener(ev, e => { if (e.target.matches && e.target.matches(FIT_SEL)) setTimeout(() => fit(e.target), 0); }));
+document.addEventListener('input', e => { if (e.target.matches && e.target.matches(FIT_SEL)) fit(e.target); });
+function flagSyms(){
+  document.querySelectorAll('input[data-f=sym]').forEach(el => { const v = el.value.trim().toUpperCase(); el.classList.toggle('invalid', M !== 'etf' && !!v && !isMFSym(v) && el !== document.activeElement); });
+}
+document.addEventListener('focusout', e => { if (e.target.dataset && e.target.dataset.f === 'sym') setTimeout(flagSyms, 0); });
+function recompute(){
+  const cash = (num($('cash').value) || 0) + (num($('addCash').value) || 0) + ($('incPending').checked ? (num($('pending').value) || 0) : 0);
+  const tsum = S.targets.reduce((s, t) => s + (t.pct || 0), 0);
+  $('pctTotal').textContent = `${M === 'etf' ? 'Total' : 'Funds total'} ${+tsum.toFixed(3)}%`;
+  $('pctTotal').className = 'status ' + (Math.abs(tsum - 100) < 0.001 ? 'good' : 'bad');
+  const r = plan({holdings: currentHoldings(), targets: S.targets, cash, units: $('units').value, mode: M, method: $('method').value, sellUnits: $('sellUnits').value, exch: $('exch').checked, mfUnits: $('mfUnits').value, whole: $('sellUnits').value === 'whole', cushion: num($('cushion').value) || 0, afterSells: M === 'etf' ? num($('afterSells').value) : null, tol: num($('tol').value) || 0, tolMode: $('tolMode').value, reserve: getReserve()});
+  S.lastPlan = r;
+  flagSyms();
+  $('mbarText').textContent = r.errors.length ? 'Fix inputs to see orders' : r.orders.length ? `${r.orders.length} order${r.orders.length > 1 ? 's' : ''} · ${usd(r.total)}` : 'Already on target';
+  $('sTotal').textContent = r.total > 0 ? usd(r.total) : '—';
+  $('sCount').textContent = r.errors.length ? '—' : r.orders.length;
+  $('sMoved').textContent = r.errors.length ? '—' : usd(r.orders.reduce((s, o) => s + o.c, 0));
+  $('msgs').innerHTML = r.errors.map(m => `<li class="bad">${esc(m)}</li>`).join('') + (r.errors.length ? '' : (r.warns || []).map(m => `<li class="warnline">${esc(m)}</li>`).join(''));
+  $('clearCopied').disabled = true;
+  $('tapHint').classList.toggle('hidden', !!r.errors.length || !r.orders.length);
+  const chip = (label, val) => `<button class="chip" data-copy="${esc(val)}" aria-label="Copy ${label} ${esc(val)}"><small><span>${label}</span><svg class="ci ci-copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg><svg class="ci ci-ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></small><span class="cv">${esc(val)}</span></button>`;
+  const card = o => {
+    const cls = o.type === 'Buy' ? 'buy' : o.type === 'Sell' ? 'sell' : '';
+    const dollars = (o.c / 100).toFixed(2);
+    const amt = o.unit === 'all' ? (o.shares ? chip('All shares', o.shares.toFixed(3)) : `<button class="chip" disabled><small>Shares</small>Sell all</button>`)
+      : o.unit === 'wshares' ? chip('Shares', String(o.shares)) + chip('Limit price', o.limit.toFixed(2))
+      : o.unit === 'shares' ? chip('Shares', o.whole ? String(o.shares) : o.shares.toFixed(3)) : chip('Dollars', dollars);
+    const syms = o.type === 'Buy' ? chip('Buy', o.to) : o.type === 'Sell' ? chip('Sell', o.from) : chip('Sell', o.from) + chip('Buy', o.to);
+    return `<li><div class="ohead"><span class="otype ${cls}">${o.type}</span><span>≈ ${usd(o.c)}</span></div><div class="chips">${syms}${amt}</div>${o.note ? `<p class="onote">${esc(o.note)}</p>` : ''}</li>`;
+};
+  const empty = '<li class="empty" style="display:block">Already on target. No orders needed.</li>';
+  const mixed = M === 'etf' && !r.errors.length;
+  const sells = mixed ? r.sells : [], mfo = mixed ? r.mfo : [], buys = mixed ? r.buys : [];
+  $('orders').innerHTML = r.errors.length ? '' : !r.orders.length ? empty : mixed ? sells.map(card).join('') : r.orders.map(card).join('');
+  $('orders2').innerHTML = mfo.map(card).join('');
+  $('orders3').innerHTML = buys.map(card).join('');
+  let step = 0;
+  [['ph1', sells], ['ph2', mfo], ['ph3', buys]].forEach(([id, arr]) => { $(id).classList.toggle('hidden', !arr.length); if (arr.length) $(id).querySelector('span').textContent = ++step; });
+  $('ph2note').classList.toggle('hidden', !mfo.length);
+  $('ph3note').classList.toggle('hidden', !(mixed && r.nextDay));
+  const showLeft = mixed && r.whole && buys.length;
+  $('ph3left').classList.toggle('hidden', !showLeft);
+  if (showLeft) $('ph3left').innerHTML = `Whole shares with limit orders. Estimated cash left over: <b>${usd(r.leftover || 0)}</b>.` + (r.cushHeld ? ` Even if every buy fills at its limit price (up to ${usd(r.cushHeld)} more than today's prices), the total stays within your cash.` : '');
+  $('afterBlock').classList.toggle('hidden', !(M === 'etf' && $('method').value === 'full' && (buys.length && (sells.length || mfo.length) || num($('afterSells').value) != null)));
+  $('afterNote').classList.toggle('hidden', !r.scaled);
+  $('allocBody').innerHTML = r.errors.length ? '' : r.rows.map(x => `<tr>
+    <td>${x.kind === 'cash' ? 'Cash' : esc(x.sym)}</td><td class="num wide">${usd(x.cur)}</td><td class="num">${pct(x.cur / r.total)}</td>
+    <td class="num">${pct(x.tgt / r.total)}</td><td class="num wide">${x.skipped ? 'within tolerance' : x.delta ? (x.delta > 0 ? '+' : '') + usd(x.delta) : '—'}</td>
+    <td class="num">${pct(x.after / r.total)}</td></tr>`).join('');
+  fitAll();
+}
+
+function ordersText(){
+  const r = S.lastPlan; if (!r || r.errors.length) return '';
+  return r.orders.map((o, i) => {
+    const amt = o.unit === 'all' ? 'ALL shares' : o.unit === 'wshares' ? `${o.shares} share${o.shares === 1 ? '' : 's'}, limit $${o.limit.toFixed(2)}` : o.unit === 'shares' ? (o.whole ? `${o.shares} share${o.shares === 1 ? '' : 's'}` : `${o.shares.toFixed(3)} shares`) : usd(o.c);
+    const what = o.type === 'Buy' ? `Buy ${o.to} from cash` : o.type === 'Sell' ? `Sell ${o.from} to cash` : `Exchange ${o.from} -> ${o.to}`;
+    return `${i + 1}. ${what}: ${amt}${o.unit !== 'dollars' ? ` (~${usd(o.c)})` : ''}`;
+  }).join('\n');
+}
+function download(name, text, type){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+$('copyOrders').onclick = async () => {
+  const t = ordersText(); if (!t) return;
+  try { await navigator.clipboard.writeText(t); $('copyMsg').textContent = 'Copied.'; }
+  catch(e){ const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); $('copyMsg').textContent = 'Copied.'; } catch(_){ $('copyMsg').textContent = 'Copy failed.'; } ta.remove(); }
+};
+$('dlOrders').onclick = () => {
+  const r = S.lastPlan; if (!r || r.errors.length) return;
+  const lines = ['Order,Type,From,To,Shares,All shares,Dollars,Limit price,Est. value'];
+  r.orders.forEach((o, i) => lines.push([i + 1, o.type, o.from, o.to, o.unit === 'wshares' ? o.shares : o.unit === 'shares' ? (o.whole ? o.shares : o.shares.toFixed(3)) : (o.unit === 'all' && o.shares ? o.shares.toFixed(3) : ''), o.unit === 'all' ? 'yes' : '', o.unit === 'dollars' ? (o.c / 100).toFixed(2) : '', o.limit ? o.limit.toFixed(2) : '', (o.c / 100).toFixed(2)].join(',')));
+  download('rebalance-orders.csv', lines.join('\n'), 'text/csv');
+};
+
+async function copyText(t){
+  try { await navigator.clipboard.writeText(t); return true; }
+  catch(e){ const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch(_){} ta.remove(); return ok; }
+}
+document.addEventListener('click', async e => {
+  const c = e.target.closest('.chip[data-copy]'); if (!c) return;
+  if (await copyText(c.dataset.copy)){ c.classList.add('used'); $('clearCopied').disabled = false; }
+});
+$('clearCopied').onclick = () => { document.querySelectorAll('.chip.used').forEach(c => c.classList.remove('used')); $('clearCopied').disabled = true; };
+
+/* ---------- presets / import / export ---------- */
+const cleanTargets = () => S.targets.filter(t => t.sym && t.pct).map(t => ({symbol: t.sym, percent: t.pct}));
+const presetMsg = t => { $('presetMsg').textContent = t; clearTimeout(presetMsg.t); presetMsg.t = setTimeout(() => $('presetMsg').textContent = '', 3500); };
+$('savePreset').onclick = () => {
+  const name = $('presetName').value.trim();
+  if (!name){ presetMsg(''); $('presetName').focus(); $('presetName').placeholder = 'Type a name first'; return; }
+  if (!cleanTargets().length){ presetMsg('Add target percentages before saving.'); return; }
+  const p = store.get(K('presets'), {}), existed = !!p[name];
+  p[name] = {targets: cleanTargets(), reserve: getReserve()}; store.set(K('presets'), p); renderPresets(); $('presetSel').value = name;
+  presetMsg(existed ? `Updated "${name}".` : `Saved "${name}".`);
+};
+$('loadPreset').onclick = () => {
+  const p = store.get(K('presets'), {}), name = $('presetSel').value; if (!p[name]) return;
+  const pr = Array.isArray(p[name]) ? {targets: p[name]} : p[name];
+  S.targets = pr.targets.map(t => ({sym: t.symbol, pct: t.percent})); setReserve(pr.reserve); $('presetName').value = name;
+  store.set(K('lastTargets'), S.targets); renderTgt(); recompute(); presetMsg(`Loaded "${name}".`);
+};
+$('delPreset').onclick = () => { const n = $('presetSel').value; if (!n) return; $('delName').textContent = `"${n}"`; $('delConfirm').classList.remove('hidden'); };
+$('delNo').onclick = () => $('delConfirm').classList.add('hidden');
+$('delYes').onclick = () => {
+  const n = $('presetSel').value, p = store.get(K('presets'), {}); delete p[n]; store.set(K('presets'), p);
+  $('delConfirm').classList.add('hidden'); renderPresets(); presetMsg(`Deleted "${n}".`);
+};
+$('presetSel').addEventListener('change', () => $('delConfirm').classList.add('hidden'));
+$('presetBox').addEventListener('toggle', () => store.set('rebal.presetsOpen', $('presetBox').open));
+$('presetBox').open = store.get('rebal.presetsOpen', false);
+$('exportTgt').onclick = () => {
+  const name = $('presetName').value.trim() || 'target-portfolio';
+  download(name.replace(/[^\w-]+/g, '_') + '.json', JSON.stringify({name, targets: cleanTargets(), cashReserve: getReserve()}, null, 2), 'application/json');
+};
+$('importTgt').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return; const text = await f.text(); let list = [];
+  try {
+    const j = JSON.parse(text); const arr = Array.isArray(j) ? j : j.targets || [];
+    list = arr.map(t => ({sym: String(t.symbol || t.sym || '').toUpperCase(), pct: num(t.percent ?? t.pct)}));
+    if (j.name) $('presetName').value = j.name;
+    if (j.cashReserve) setReserve(j.cashReserve);
+  } catch(_){
+    list = parseCSV(text).map(r => ({sym: (r[0] || '').trim().toUpperCase(), pct: num(r[1])})).filter(t => t.sym && t.pct != null);
+  }
+  if (list.length){ S.targets = list; store.set(K('lastTargets'), S.targets); renderTgt(); recompute(); }
+  e.target.value = '';
+};
+
+/* ---------- Fidelity CSV ---------- */
+function parseCSV(text){
+  text = text.replace(/^﻿/, '');
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if (q){ if (ch === '"'){ if (text[i + 1] === '"'){ cell += '"'; i++; } else q = false; } else cell += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ','){ row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r'){ if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += ch;
+  }
+  if (cell || row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+const CORE_MM = new Set(['SPAXX', 'FDRXX', 'FZFXX', 'SPRXX', 'FCASH', 'CORE']);
+function parseFidelity(text){
+  const rows = parseCSV(text);
+  const hi = rows.findIndex(r => r.some(c => /^symbol$/i.test(c.trim())) && r.some(c => /quantity|current value/i.test(c)));
+  if (hi < 0) throw new Error('Could not find a header row with "Symbol".');
+  const head = rows[hi].map(c => c.trim().toLowerCase());
+  const col = re => head.findIndex(h => re.test(h));
+  const cNum = col(/^account number/), cName = col(/^account name/), cSym = col(/^symbol$/), cDesc = col(/^description/),
+        cQty = col(/^quantity/), cPx = col(/^last price$/), cVal = col(/^current value/);
+  const accts = new Map();
+  for (const r of rows.slice(hi + 1)){
+    if (r.length < 4) continue;
+    const sym = (r[cSym] || '').trim(), desc = cDesc >= 0 ? r[cDesc] || '' : '';
+    if (!sym) continue;
+    const key = [cNum >= 0 ? r[cNum] : '', cName >= 0 ? r[cName] : ''].filter(Boolean).join(' – ') || 'Account';
+    if (!accts.has(key)) accts.set(key, {cash: 0, pending: 0, positions: []});
+    const a = accts.get(key);
+    let val = cVal >= 0 ? num(r[cVal]) : null;
+    if (/pending activity/i.test(sym + ' ' + desc)){
+      if (val == null) for (let k = cSym + 1; k < r.length; k++){ const v = num(r[k]); if (v != null){ val = v; break; } }
+      a.pending += val || 0;
+    } else if (/\*\*$/.test(sym) || CORE_MM.has(sym.toUpperCase()) || (/money market|cash reserves/i.test(desc) && num(r[cPx]) === 1)) a.cash += val || 0;
+    else a.positions.push({sym: sym.replace(/\*+$/, '').toUpperCase(), shares: cQty >= 0 ? num(r[cQty]) : null, price: cPx >= 0 ? num(r[cPx]) : null, value: val});
+  }
+  if (!accts.size) throw new Error('No positions found.');
+  return accts;
+}
+function applyAccount(key){
+  const a = S.csvAccounts.get(key);
+  S.holdings = a.positions.map(p => { if (p.price) S.prices[p.sym] = {price: p.price, src: 'Fidelity CSV'}; return {sym: p.sym, shares: p.price ? p.shares : null, value: p.value}; });
+  if (!S.holdings.length) S.holdings = [{sym: '', shares: null, value: null}];
+  $('cash').value = a.cash ? a.cash.toFixed(2) : '';
+  $('pending').value = a.pending ? a.pending.toFixed(2) : '';
+  renderHold(); renderTgt(); recompute();
+}
+async function loadCSVFile(f){
+  try {
+    S.csvAccounts = parseFidelity(await f.text());
+    const keys = [...S.csvAccounts.keys()];
+    $('acctSel').innerHTML = keys.map(k => `<option>${esc(k)}</option>`).join('');
+    $('acctRow').classList.toggle('hidden', keys.length < 2);
+    applyAccount(keys[0]);
+    $('priceStatus').textContent = `Loaded ${f.name}.`; $('priceStatus').className = 'status good';
+  } catch(err){ $('priceStatus').textContent = 'CSV: ' + err.message; $('priceStatus').className = 'status bad'; }
+}
+$('csvFile').onchange = e => { if (e.target.files[0]) loadCSVFile(e.target.files[0]); e.target.value = ''; };
+$('acctSel').onchange = () => applyAccount($('acctSel').value);
+const drop = $('drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); });
+drop.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) loadCSVFile(f); });
+
+
+applyMode(); addClears(); renderHold(); renderTgt(); renderPresets(); recompute();
+if ('IntersectionObserver' in window){
+  const mbarObs = new IntersectionObserver(es => { for (const e of es) $('mbar').classList.toggle('off', e.isIntersecting || e.boundingClientRect.top < 0); });
+  mbarObs.observe($('ordersTop').closest('section'));
+}
+}
+</script>
+</body>
+</html>
